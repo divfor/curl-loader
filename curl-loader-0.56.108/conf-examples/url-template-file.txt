@@ -1,2 +1,0 @@
-joe@foefum.org	admin	r$64gh	id=BAh7BzoPYXV0aF91c2Vyc2k
-sally@foo.com	public	secret	id=VyOjpGbGFzaDo6Rmxhc2hIY
