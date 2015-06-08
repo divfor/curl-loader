@@ -1,0 +1,478 @@
+/* 
+ *     loader_hyper.c
+ *
+ * 2006-2007 Copyright (c)
+ * Michael Moser, <moser.michael@gmail.com>
+ * Robert Iakobashvili, <coroberti@gmail.com>
+ * All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ *
+ * Cooked using CURL-project example hypev.c with thanks to the 
+ * great CURL-project authors and contributors.
+ */
+
+#include <stdlib.h>
+#include <errno.h>
+#include <unistd.h>
+#include <netinet/in.h>
+#include <event2/event.h>
+#include <string.h>
+
+#include "batch.h"
+#include "client.h"
+#include "loader.h"
+#include "conf.h"
+#include "cl_alloc.h"
+#include "screen.h"
+
+//#define TIMER_NEXT_LOAD 20000    /*0.02 second*/
+#define TIMER_NEXT_DUMP_STATISTICS 3
+
+#if 0
+#define PRINTF(args...) fprintf(stdout, ## args);
+#else
+#define PRINTF 
+#endif
+
+typedef struct sock_info
+{
+	curl_socket_t sockfd;
+	int action;  /*CURL_POLL_IN CURL_POLL_OUT */
+	long timeout;
+	struct event *ev;
+	int evset;
+} sock_info;
+
+int still_running=1;
+static struct timeval timeout_next_dump_stats={TIMER_NEXT_DUMP_STATISTICS, 0};
+
+/* Check for completed transfers, and remove their easy handles */
+/*Read datas from socket.   -Simon*/
+static void check_multi_info(batch_context *bctx)
+{
+	CURLMsg *msg;
+	int msgs_left;
+	CURL *handle;
+	int cycle_counter = 0;
+	int scheduled_now_count = 0, scheduled_now = 0;
+	client_context *cctx = NULL;
+	char *curlinfo = NULL;
+	int st=0;
+	unsigned long now_time=get_tick_count ();
+
+	while((msg = curl_multi_info_read (bctx->multiple_handle, &msgs_left)))
+	{
+		if (msg->msg == CURLMSG_DONE)
+		{
+			handle = msg->easy_handle;
+
+			curl_easy_getinfo (handle, CURLINFO_PRIVATE, &curlinfo);
+			cctx = (client_context *)curlinfo;
+
+			if (!cctx)
+			{
+				return;
+			}
+
+			if (msg->data.result)
+			{
+				cctx->client_state = CSTATE_ERROR;        
+			}
+
+			if (! (++cycle_counter % TIME_RECALCULATION_MSG_NUM))
+			{
+				now_time = get_tick_count ();
+			}
+
+			load_next_step (cctx, now_time, &scheduled_now);
+
+			if (scheduled_now)
+			{
+				scheduled_now_count++;
+			}
+			
+			if (msgs_left <= 0)
+			{
+				break; 
+			}
+
+			cycle_counter++;
+		}
+	}
+
+	if (dispatch_expired_timers (bctx, now_time) > 0 || scheduled_now_count)
+	{
+		curl_multi_socket_action(bctx->multiple_handle, CURL_SOCKET_TIMEOUT, 0, &st);
+	}
+
+#if 0
+	{
+		struct timeval timeout;
+
+		timeout.tv_sec = 0;
+		timeout.tv_usec = 20000;
+
+		evtimer_add(bctx->timer_event, &timeout);
+	}
+#endif
+
+	return;
+}
+
+/************************************************************************
+ * Function name - event_cb_hyper
+ *
+ * Description - A libevent callback. Called by libevent when we get action on a socket.
+ * Input -       fd - descriptor (socket)
+ *                   kind -  a bitmask of events from libevent
+ *                   *userp - user pointer, we pass pointer to batch-context structure
+ * Return Code/Output - None
+ *************************************************************************/
+static void event_sock_rw_cb (int fd, short kind, void *userp)
+{
+	batch_context *bctx = (batch_context *) userp;
+	int still_running_num;
+
+	int bitset = 0;
+	
+
+	if (kind & EV_READ) 
+	{
+		bitset |= CURL_CSELECT_IN;
+	}
+	if (kind & EV_WRITE) 
+	{
+		bitset |= CURL_CSELECT_OUT;
+	}
+
+	curl_multi_socket_action (bctx->multiple_handle, fd, bitset, &still_running_num);
+	//PRINTF("------Enter %s     still_running_num=%d.\n", __FUNCTION__, still_running_num);
+	check_multi_info(bctx);
+
+	return;
+}
+
+/************************************************************************
+ * Function name - timer_cb_hyper
+ *
+ * Description - A libevent callback. Called by libevent when timeout expires
+ * Input -       fd - descriptor (socket)
+ *                   kind -  a bitmask of events from libevent
+ *                   *userp - user pointer, we pass pointer to batch-context structure
+ * Return Code/Output - None
+ *************************************************************************/
+static void event_timer_cb (int fd, short kind, void *userp)
+{
+	(void)fd;
+	(void)kind;
+	batch_context *bctx = (batch_context *)userp;
+	int st;
+
+    /*在CURL_SOCKET_TIMEOUT时间内调用socket_callback() */
+	/*Call curl_multi_socket_action(..., CURL_SOCKET_TIMEOUT, 0, ...) to kickstart everything. */
+	curl_multi_socket_action(bctx->multiple_handle, CURL_SOCKET_TIMEOUT, 0, &st);
+	//PRINTF("------Enter %s     still_running_num=%d.\n", __FUNCTION__, st);
+	check_multi_info(bctx);
+
+	return;
+}
+
+/************************************************************************
+ * Function name - remsock
+ *
+ * Description - Clean up the sock_info structure
+ * Input -      *sinfo - pointer to sinfo structure 
+ * Return Code/Output - None
+ *************************************************************************/
+static void remsock(sock_info *sinfo)
+{
+	if (!sinfo) 
+	{ 
+		return; 
+	}
+
+	if (sinfo->evset) 
+	{ 
+		event_free(sinfo->ev); 
+	}
+
+	sinfo->evset = 0;
+}
+
+/************************************************************************
+ * Function name - setsock_hyper
+ *
+ * Description - Assign information to a sock_info structure
+ * Input -      *sinfo - pointer to sinfo structure to fill
+ *               socket - socket descriptor
+ *               *handle -  pointer to CURL library handle
+ *               action - bitmask of events from curl library
+ *               *bctx - pointer to batch context
+ * Return Code/Output - None
+ *************************************************************************/
+static void setsock_hyper(sock_info*sinfo, curl_socket_t socket, CURL* handle, int action, batch_context* bctx)
+{
+	int kind = (action & CURL_POLL_IN ? EV_READ : 0)|(action & CURL_POLL_OUT ? EV_WRITE : 0)|EV_PERSIST;
+
+	(void) handle;
+
+	sinfo->sockfd = socket;
+	sinfo->action = action;
+
+	if (sinfo->evset) 
+	{ 
+		event_free(sinfo->ev);
+	}
+
+	//event_set( &sinfo->ev, sinfo->sockfd, kind, event_cb_hyper, bctx);
+	//event_base_set(bctx->eb, &sinfo->ev);
+	sinfo->ev = event_new(bctx->eb, sinfo->sockfd, kind, event_sock_rw_cb, bctx);
+
+	sinfo->evset=1;
+
+	event_add(sinfo->ev, NULL);
+}
+
+/************************************************************************
+ * Function name - addsock_hyper
+ *
+ * Description - Initialize a new sock_info structure
+ *
+ * Input -   socket - socket descriptor   
+ *               *handle -  pointer to CURL library handle
+ *               action - bitmask of events from curl library
+ *               *cctx - pointer to client context
+ *               *sinfo - pointer to sinfo structure to fill
+ *               *bctx - pointer to batch context
+ * Return Code/Output - None
+ *************************************************************************/
+static void addsock_hyper(curl_socket_t socket, CURL *handle, int action, client_context *cctx, sock_info *sinfo, batch_context *bctx) 
+{
+	setsock_hyper (sinfo, socket, handle, action, bctx);
+
+	curl_multi_assign (bctx->multiple_handle, socket, cctx);
+
+	return;
+}
+
+
+/************************************************************************
+ * Function name - socket_callback
+ *
+ * Description - A libcurl socket callback. Called by libcurl, when there is an
+ *                    event on socket. Unfortunately, it is called only for the trasfer stage.
+ *
+ * Input -       *handle - pointer to CURL handle
+ *                   socket - socket descriptor
+ *                  what - libcurl event bitmask
+ *                  *cbp - libcurl callback pointer; we pass batch context here
+ *                   *sockp - pointer to the handle user-assigned private data, here client-context 
+ * Return Code/Output - On Success - 0, on Error -1
+ *************************************************************************/
+
+static int multi_socket_cb (CURL *handle, curl_socket_t socket, int what, void *cbp, void *sockp)
+{
+	batch_context* bctx = (batch_context *) cbp;
+	client_context* cctx = (client_context *) sockp;
+	sock_info *sinfo = (sock_info*) cctx ? cctx->ext_data : 0;
+	char *curlinfo = NULL;
+
+	//PRINTF("------Enter %s.\n", __FUNCTION__);
+
+	if (!cctx)
+	{  		  
+		curl_easy_getinfo (handle, CURLINFO_PRIVATE, &curlinfo);
+		cctx = (client_context *)curlinfo;
+
+		if (cctx) 
+		{
+			sinfo = (sock_info*)cctx->ext_data;
+		}
+	}
+
+	if (!cctx || !sinfo) 
+	{
+		return 0;
+	}
+
+	if (what == CURL_POLL_REMOVE) 
+	{
+		remsock(sinfo);
+	} 
+	else 
+	{
+		if (!sinfo->evset) 
+		{
+			//PRINTF("Adding data: %s%s\n", what & CURL_POLL_IN ? "READ":"", what & CURL_POLL_OUT ? "WRITE":"" );
+			addsock_hyper (socket, handle, what, cctx, sinfo, bctx);
+		}
+		else 
+		{
+			//PRINTF("Changing action from %d to %d\n", sinfo->action, what);
+			setsock_hyper(sinfo, socket, handle, what, bctx);
+		}
+	}
+
+	return 0;
+}
+
+
+/* Update the event timer after curl_multi library calls */
+static int multi_timer_cb(CURLM *multi, long timeout_ms, batch_context *bctx)
+{
+  struct timeval timeout;
+  (void)multi; /* unused */
+
+  timeout.tv_sec = timeout_ms/1000;
+  timeout.tv_usec = (timeout_ms%1000)*1000;
+
+  //PRINTF("------Enter %s    timeout=%ld.\n", __FUNCTION__, timeout_ms);
+  evtimer_add(bctx->timer_event, &timeout);
+  
+  return 0;
+}
+
+
+static int on_exit_hyper (batch_context* bctx)
+{
+	still_running =0;
+
+	dump_final_statistics (bctx->cctx_array);
+	screen_release ();
+
+	if (bctx->waiting_queue)
+	{
+		/* Cancel periodic timers */
+		cancel_periodic_timers (bctx);
+
+		tq_release (bctx->waiting_queue);
+		free (bctx->waiting_queue);
+		bctx->waiting_queue = 0;
+	}
+
+	exit (0);
+}
+
+static void dump_statistics_timer_cb (int fd, short kind, void *userp)
+{
+	(void)fd;
+	(void)kind;
+	batch_context *bctx = (batch_context *)userp;
+	unsigned long now_time = get_tick_count();
+
+	if (pending_active_and_waiting_clients_num (bctx) == 0 && bctx->do_client_num_gradual_increase == 0)
+	{
+		on_exit_hyper (bctx);
+		return ;
+	}
+
+
+	if (is_batch_group_leader (bctx))
+	{
+		dump_snapshot_interval (bctx, now_time);
+	}
+
+	evtimer_add(bctx->timer_next_dump_statistics, &timeout_next_dump_stats);
+
+	return;
+}
+
+
+
+/****************************************************************************************
+ * Function name - user_activity_hyper
+ *
+ * Description - Simulates user-activities using HYPER mode
+ * Input -       *cctx_array - array of client contexts (related to a certain batch of clients)
+ *
+ * Return Code/Output - On Success - 0, on Error -1
+ ****************************************************************************************/
+
+
+
+ /****************************************************************************************
+1. init_timers_and_add_initial_clients_to_load()添加clients, 并调用curl_multi_add_handle ();
+2. multi_timer_cb(), 增加timer_event事件。(由于执行curl_multi_add_handle ()会改变timeout,所以触发multi_timer_cb())
+3. timer_cb_hyper(), 此函数会perform the easy handle, 并且在timeout时间内调用socket_callback()
+4. socket_callback() add socket事件，并设定回调函数为event_cb_hyper()
+5. event_cb_hyper()读取socket数据
+
+
+  ****************************************************************************************/
+
+int user_activity_hyper (client_context* cctx_array)
+{
+	batch_context* bctx = cctx_array->bctx;
+	sock_info *sinfo;
+	int k;
+	unsigned long now_time=0;
+
+	if (!bctx)
+	{
+		fprintf (stderr, "%s - error: bctx is a NULL pointer.\n", __func__);
+		return -1;
+	}
+
+	/* Init libevent library */
+	bctx->eb = event_base_new();
+	bctx->timer_event = evtimer_new(bctx->eb, event_timer_cb, bctx);
+	bctx->timer_next_dump_statistics = evtimer_new(bctx->eb, dump_statistics_timer_cb, bctx);
+
+	evtimer_add(bctx->timer_next_dump_statistics, &timeout_next_dump_stats);
+
+	/* Set the socket callback on multi-handle */ 
+    /*执行curl_multi_socket_action()时调用此函数。*/
+	curl_multi_setopt (bctx->multiple_handle, CURLMOPT_SOCKETFUNCTION, multi_socket_cb);
+	curl_multi_setopt (bctx->multiple_handle, CURLMOPT_SOCKETDATA, bctx);
+
+    /*timeout值改变时调用此函数。执行curl_multi_add_handle ()时timeout值会改变。*/
+	curl_multi_setopt(bctx->multiple_handle, CURLMOPT_TIMERFUNCTION, multi_timer_cb);
+	curl_multi_setopt(bctx->multiple_handle, CURLMOPT_TIMERDATA, bctx);
+
+	for (k = 0 ; k < bctx->client_num_max ; k++)
+	{
+		sinfo = cl_calloc (1, sizeof (sock_info));
+		if (!sinfo)
+		{
+			fprintf (stderr, "%s - error: allocation of sock_info failed.\n", __func__);
+			return -1;
+		}
+
+		bctx->cctx_array[k].ext_data = sinfo;
+	}
+
+	if (alloc_init_timer_waiting_queue (bctx->client_num_max + PERIODIC_TIMERS_NUMBER + 1, &bctx->waiting_queue) == -1)
+	{
+		fprintf (stderr, "%s - error: failed to alloc or init timer waiting queue.\n", __func__);
+		return -1;
+	}
+
+	now_time = get_tick_count ();
+
+	if (init_timers_and_add_initial_clients_to_load (bctx,now_time) == -1)
+	{
+		fprintf (stderr, "%s - error: init_timers_and_add_initial_clients_to_load () failed.\n",  __func__);
+		return -1;
+	}
+
+	event_base_dispatch(bctx->eb);
+
+	on_exit_hyper (bctx);
+
+	return 0;
+}
+
+

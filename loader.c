@@ -131,7 +131,10 @@ static void init_some_batch_values(batch_context *master)
 	memset (master->cl_hostname, 0, 128);
 	gethostname(master->cl_hostname, 127);
 
-	connect_redis_server(master);
+	if (master->reporting_way == REDIS_REPORTING || master->reporting_way == CONSOLE_AND_REDIS)
+	{
+		connect_redis_server(master);
+	}
 }
 
 int main (int argc, char *argv [])
@@ -185,6 +188,11 @@ int main (int argc, char *argv [])
      Add ip-addresses to the loading network interfaces
      and keep them in batch-contexts. 
   */
+  //if (is_batch_group_leader (&bc_arr[0]))
+  {
+      fprintf (stderr, "Loading ...");
+  }
+  
   if (create_ip_addrs (bc_arr, batches_num) == -1)
     {
       fprintf (stderr, "%s - error: create_ip_addrs () failed. \n", __func__);
@@ -192,15 +200,16 @@ int main (int argc, char *argv [])
     }
   else
     {
-      fprintf (stderr, 
-               "%s - added IP-addresses to the loading network interface.\n", 
-               __func__);
+      //fprintf (stderr, 
+        //       "%s - added IP-addresses to the loading network interface.\n", 
+         //      __func__);
     }
 
   signal (SIGINT, sigint_handler);
 
   //screen_init ();
   init_some_batch_values(&bc_arr[0]);
+
 
   if (! threads_subbatches_num)
     {
@@ -222,7 +231,11 @@ int main (int argc, char *argv [])
           return -1;
         }
 
-      create_thr_subbatches (bc_arr, threads_subbatches_num); 
+      if (create_thr_subbatches (bc_arr, threads_subbatches_num) == -1)
+      	{
+      	  fprintf (stderr, "%s - error: create_thr_subbatches () - failed.\n", __func__);
+          return -1;
+      	}
       
       /* 
          Opening threads for the batches of clients 
@@ -326,6 +339,11 @@ static void* batch_function (void * batch_data)
   /* 
      Init the objects, containing client-context information.
   */
+	if (is_batch_group_leader (bctx))
+	{
+	  fprintf (stderr, "...");
+	}
+
   if (init_client_contexts (bctx, log_file) == -1)
     {
       fprintf (stderr, "%s - \"%s\" - failed to allocate or init client_contexts.\n", 
@@ -2050,16 +2068,16 @@ static int create_thr_subbatches (batch_context *bc_arr, int subbatches_num)
       return -1;   
   }
 
-  batch_context master;
-  memcpy (&master, &bc_arr[0], sizeof (master));
-
-
-  if (master.client_num_max < subbatches_num)
+  if (bc_arr[0].client_num_max < subbatches_num)
   {
       fprintf (stderr, "%s - error: wrong input CLIENT_NUM_MAX is less than "
                "the subbatches number (%d).\n", __func__, subbatches_num);
       return -1;
   }
+
+
+  batch_context master;
+  memcpy (&master, &bc_arr[0], sizeof (master));
 
   int c_num_max = 0;
 
@@ -2221,7 +2239,7 @@ static int create_thr_subbatches (batch_context *bc_arr, int subbatches_num)
 	  bc_arr[i].proxy_auth_method=master.proxy_auth_method;
 	  bc_arr[i].client_creds_num= master.client_creds_num / subbatches_num;
 	  
-	  if (master.client_creds_array && master.client_principle_name_array)
+	  if (master.client_creds_array && master.client_principle_name_array && master.proxy_auth_method != CURLAUTH_NONE)
 	  {
 		  if (master.proxy_credentials_type == 0)
 		  {
