@@ -8,10 +8,7 @@ FBOPENSSL_VER=0.0.4.106
 CARES_VER=1.7.5
 #LIBEVENT_VER=2.0.21-stable
 LIBEVENT_VER=1.4.14b-stable
-#CURL_VER=7.33.0.107
-CURL_VER=7.24.0.107
-#CURL_VER=7.34.0
-#CURL_VER=bad
+CURL_VER=7.24.0.110
 HIREDIS_VER=0.11.0
 
 INSTALL_PATH=/usr/curl-loader
@@ -236,7 +233,7 @@ make_curl(){
     if [ ! -f "$CURL_LIB_PATH/libcurl.a" ]; then
         rm -rf  packages/curl-$CURL_VER/; rm -rf $CURL_INSTALL_PATH; mkdir -p $CURL_INSTALL_PATH;
         cd packages/; tar jxvf curl-$CURL_VER.tar.bz2; patch -d curl-$CURL_VER -p1 < ../patches/curl-trace-info-error.patch;
-        cd curl-$CURL_VER; ./buildconf; ./configure --prefix=$CURL_INSTALL_PATH --disable-file --disable-rtsp --disable-telnet --disable-sspi --disable-tftp   \
+        cd curl-$CURL_VER; ./configure --prefix=$CURL_INSTALL_PATH --disable-file --disable-rtsp --disable-telnet --disable-sspi --disable-tftp   \
                            --disable-pop3 --disable-imap --disable-smtp --disable-gopher --disable-manual --without-libmetalink --without-libidn   \
                            --without-librtmp --without-winssl --without-darwinssl --without-libssh2 --without-gnutls --without-polarssl --without-cyassl  \
                            --without-nss --without-axtls --disable-ldap --disable-ipv6 --enable-thread --with-random=/dev/urandom   \

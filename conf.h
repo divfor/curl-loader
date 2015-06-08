@@ -26,7 +26,7 @@
 #include <stddef.h>
 #include <linux/limits.h> /* NAME_MAX, PATH_MAX */
 
-#define VERSION_NUMBER "Curl-loader 0.56.109"
+#define VERSION_NUMBER "Curl-loader 0.56.110"
 
 /* ----------------------------------------------------------------------------
    Global configuration parameters, comming with the command-line.
