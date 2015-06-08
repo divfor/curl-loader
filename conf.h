@@ -26,7 +26,7 @@
 #include <stddef.h>
 #include <linux/limits.h> /* NAME_MAX, PATH_MAX */
 
-#define VERSION_NUMBER "Curl-loader 0.56.105"
+#define VERSION_NUMBER "Curl-loader 0.56.108"
 
 /* ----------------------------------------------------------------------------
    Global configuration parameters, comming with the command-line.
@@ -66,12 +66,6 @@ extern long snapshot_statistics_timeout;
 */
 extern long logfile_rewind_size;
 
-/* 
-   Whether to print to stdout the body of the downloaded file.
-   Used for debugging.
-*/
-extern int output_to_stdout;
-
 /*
    If to output all client messages to stderr, otherwise to the batch logfile/s. 
 */
@@ -84,6 +78,7 @@ extern int stderr_print_client_msg;
 */
 extern unsigned long error_recovery_client;
 
+#if 0
 /*
   Loading modes: Storming and Smooth 
 */
@@ -96,6 +91,7 @@ enum load_mode
 #define LOAD_MODE_DEFAULT LOAD_MODE_HYPER
 
 extern int loading_mode;
+#endif
 
 /* 
    Whether to include url name string to all log outputs. May be useful,

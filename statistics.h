@@ -29,6 +29,13 @@
 
 #include "timer_tick.h"
 
+typedef enum reporting_way{
+	CONSOLE_REPORTING=0,
+	REDIS_REPORTING,
+	CONSOLE_AND_REDIS,
+}reporting_way;
+
+
 /*
   stat_point -the structure is used to collect loading statistics.
   Two instances of the structure are kept by each batch context. 
@@ -108,6 +115,175 @@ typedef struct op_stat_point
   unsigned long call_init_count;
 
 } op_stat_point;
+
+
+typedef struct redis_statistics_output
+{
+	int d_redis_keepalive_secs;
+	char *s_redis_keepalive_secs;
+	
+	int d_total_client;
+	char *s_total_client;
+
+	int d_cycle_interval;
+	char *s_cycle_interval;
+
+	int d_http_request_num;
+	char *s_http_request_num;
+
+	int d_hf_1xx;
+	char *s_hf_1xx;
+
+	int d_hf_2xx;
+	char *s_hf_2xx;
+
+	int d_hf_3xx;
+	char *s_hf_3xx;
+
+	int d_hf_4xx;
+	char *s_hf_4xx;
+
+	int d_hf_5xx;
+	char *s_hf_5xx;
+
+	int d_hf_err;
+	char *s_hf_err;
+
+	int d_hf_t_err;
+	char *s_hf_t_err;
+
+	int d_hf_delay;
+	char *s_hf_delay;
+		
+	int d_hf_delay_2xx;
+	char *s_hf_delay_2xx;
+
+	int d_hf_input_traffic;
+	char *s_hf_input_traffic;
+
+	int d_hf_output_traffic;
+	char *s_hf_output_traffic;
+
+	int d_https_request_num;
+	char *s_https_request_num;
+
+	int d_hfs_1xx;
+	char *s_hfs_1xx;
+
+	int d_hfs_2xx;
+	char *s_hfs_2xx;
+
+	int d_hfs_3xx;
+	char *s_hfs_3xx;
+
+	int d_hfs_4xx;
+	char *s_hfs_4xx;
+
+	int d_hfs_5xx;
+	char *s_hfs_5xx;
+
+	int d_hfs_err;
+	char *s_hfs_err;
+
+	int d_hfs_t_err;
+	char *s_hfs_t_err;
+
+	int d_hfs_delay;
+	char *s_hfs_delay;
+
+	int d_hfs_delay_2xx;
+	char *s_hfs_delay_2xx;
+
+	int d_hfs_input_traffic;
+	char *s_hfs_input_traffic;
+
+	int d_hfs_output_traffic;
+	char *s_hfs_output_traffic;
+
+	int d_caps_current;
+	char *s_caps_current;
+
+	int d_total_duration;
+	char *s_total_duration;
+
+	int d_total_http_request_num;
+	char *s_total_http_request_num;
+		 
+	int d_total_hf_1xx;
+	char *s_total_hf_1xx;
+
+	int d_total_hf_2xx;
+	char *s_total_hf_2xx;
+
+	int d_total_hf_3xx;
+	char *s_total_hf_3xx;
+
+	int d_total_hf_4xx;
+	char *s_total_hf_4xx;
+
+	int d_total_hf_5xx;
+	char *s_total_hf_5xx;
+
+	int d_total_hf_err;
+	char *s_total_hf_err;
+
+	int d_total_hf_t_err;
+	char *s_total_hf_t_err;
+
+	int d_average_hf_delay;
+	char *s_average_hf_delay;
+
+	int d_average_hf_delay_2xx;
+	char *s_average_hf_delay_2xx;
+
+	int d_average_hf_input_traffic;
+	char *s_average_hf_input_traffic;
+
+	int d_average_hf_output_traffic;
+	char *s_average_hf_output_traffic;
+
+	int d_total_https_request_num;
+	char *s_total_https_request_num;
+
+	int d_total_hfs_1xx;
+	char *s_total_hfs_1xx;
+
+	int d_total_hfs_2xx;
+	char *s_total_hfs_2xx;
+
+	int d_total_hfs_3xx;
+	char *s_total_hfs_3xx;
+
+	int d_total_hfs_4xx;
+	char *s_total_hfs_4xx;
+
+	int d_total_hfs_5xx;
+	char *s_total_hfs_5xx;
+
+	int d_total_hfs_err;
+	char *s_total_hfs_err;
+
+	int d_total_hfs_t_err;
+	char *s_total_hfs_t_err;
+
+	int d_average_hfs_delay;
+	char *s_average_hfs_delay;
+
+	int d_average_hfs_delay_2xx;
+	char *s_average_hfs_delay_2xx;
+
+	int d_average_hfs_input_traffic;
+	char *s_average_hfs_input_traffic;
+
+	int d_average_hfs_output_traffic;
+	char *s_average_hfs_output_traffic;
+
+	int d_average_caps;
+	char *s_average_caps;
+}redis_statistics_output;
+
+
+
 
 /*******************************************************************************
 * Function name - stat_point_add
@@ -203,66 +379,12 @@ void op_stat_call_init_count_inc (op_stat_point* op_stat);
 struct client_context;
 struct batch_context;
 
-/****************************************************************************************
-* Function name - dump_final_statistics
-*
-* Description - Dumps final statistics counters to stdout and statistics file using 
-*               print_snapshot_interval_statistics and print_statistics_* functions.
-*               At the end calls dump_clients () to dump the clients table.
-*
-* Input -       *cctx - pointer to client context, where the decision to complete loading 
-*                       (and dump) has been made. 
-* Return Code/Output - None
-****************************************************************************************/
-void dump_final_statistics (struct client_context* cctx);
-
-/******
-* Function name - ascii_time
-*
-* Description - evaluate current time in ascii
-*
-* Input -       *tbuf - pointer to time buffer
-* Return -      tbuf filled with time
-******/
-
 char *ascii_time (char *tbuf);
-
-/****************************************************************************************
-* Function name - dump_snapshot_interval
-*
-* Description - Dumps summary statistics since the start of load
-* and up to the interval
-*
-* Input -       *bctx - pointer to batch structure
-*               now   - current time in msec since the epoch
-* Return Code/Output - None
-****************************************************************************************/
-void dump_snapshot_interval (struct batch_context* bctx, unsigned long now);
-
-
-/****************************************************************************************
-* Function name - print_snapshot_interval_statistics
-*
-* Description - Calculates and outputs statistics for the latests snapshot interval. 
-*                     
-* Input -       clients - number of active clients
-*               period  - latest time period in milliseconds
-*               *http   - pointer to the HTTP collected statistics to output
-*               *https  - pointer to the HTTPS collected statistics to output
-* Return Code/Output - None
-****************************************************************************************/
-void print_snapshot_interval_statistics (unsigned long period,  
-                                         stat_point *http,
-                                         stat_point *https);
-
-/****************************************************************************************
-* Function name - print_statistics_header
-*
-* Description - Prints to a file header for statistics numbers, describing counters
-*
-* Input -       *file - open file pointer
-* Return Code/Output - None
-****************************************************************************************/
 void print_statistics_header (FILE* file);
 
+extern void generate_cycle_log (struct batch_context* bctx, unsigned long now_time, int clients_total_num);
+extern void generate_final_log (struct batch_context* bctx);
+extern int connect_redis_server(struct batch_context* bctx);
+extern void generate_cycle_reporting(struct batch_context* bctx, unsigned long now);
+extern int disconnect_redis_server (struct batch_context* bctx);
 #endif /* STATISTICS_H */

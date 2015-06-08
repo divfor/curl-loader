@@ -898,7 +898,7 @@ int add_secondary_ip_addrs (const char*const interface,
 
   for (j = 0; j < addr_number && addresses[j] ; j++)
     {
-        fprintf (stderr, "%s - setting secondary IP %s\n", __func__, addresses[j]);
+        //fprintf (stderr, "%s - setting secondary IP %s\n", __func__, addresses[j]);
 
         snprintf (ip_slash_mask_buffer, 
                   sizeof (ip_slash_mask_buffer) -1, 
@@ -909,6 +909,7 @@ int add_secondary_ip_addrs (const char*const interface,
                                                 ip_slash_mask_buffer,
                                                 addr_scope);
 
+#if 0
       switch (rval_set_ip)
         {
         case -1:
@@ -929,6 +930,7 @@ int add_secondary_ip_addrs (const char*const interface,
                    __func__,  ip_slash_mask_buffer);
           break;
         }
+#endif	  
     }
   return 0;
 }

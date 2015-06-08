@@ -37,38 +37,6 @@
 #include "statistics.h"
 #include "screen.h"
 
-#define UNSECURE_APPL_STR "H/F   "
-#define SECURE_APPL_STR "H/F/S "
-
-
-static void
-dump_snapshot_interval_and_advance_total_statistics (batch_context* bctx,
-                                                     unsigned long now_time,
-                                                     int clients_total_num);
-
-static void dump_statistics (unsigned long period, 
-                             stat_point *http, 
-                             stat_point *https);
-
-static void print_statistics_footer_to_file (FILE* file);
-
-static void print_statistics_data_to_file (FILE* file, 
-                                           unsigned long timestamp,
-                                           char* prot,
-                                           long clients_num,
-                                           stat_point *sd,
-                                           unsigned long period);
-
-static void print_operational_statistics (FILE *opstats_file,
-                                          op_stat_point*const osp_curr,
-                                          op_stat_point*const osp_total,
-                                          url_context* url_arr);
-
-static void dump_stat_to_screen (char* protocol, 
-                                 stat_point* sd, 
-                                 unsigned long period);
-
-static void dump_clients (client_context* cctx_array);
 
 /****************************************************************************************
 * Function name - stat_point_add
@@ -334,119 +302,6 @@ unsigned long get_tick_count ()
 }
 
 
-/****************************************************************************************
-* Function name - dump_final_statistics
-*
-* Description - Dumps final statistics counters to stdout and statistics file using 
-*               print_snapshot_interval_statistics and print_statistics_* functions.
-*               At the end calls dump_clients () to dump the clients table.
-*
-* Input -       *cctx - pointer to client context, where the decision to 
-*                       complete loading (and dump) has been made. 
-* Return Code/Output - None
-****************************************************************************************/
-void dump_final_statistics (client_context* cctx)
-{
-  int i;
-  batch_context* bctx = cctx->bctx;
-  unsigned long now = get_tick_count();
-
-  for (i = 0; i <= threads_subbatches_num; i++)
-    {
-      if (i)
-        {
-          stat_point_add (&bctx->http_delta, &(bctx + i)->http_delta);
-          stat_point_add (&bctx->https_delta, &(bctx + i)->https_delta);
-          
-          /* Other threads statistics - reset just after collecting */
-          stat_point_reset (&(bctx + i)->http_delta); 
-          stat_point_reset (&(bctx + i)->https_delta);
-        }
-    }
-  
-  print_snapshot_interval_statistics (now - bctx->last_measure,
-		&bctx->http_delta,  
-		&bctx->https_delta);
-
-  stat_point_add (&bctx->http_total, &bctx->http_delta);
-  stat_point_add (&bctx->https_total, &bctx->https_delta); 
-    
-  fprintf(stdout,"\n==================================================="
-          "====================================\n");
-  fprintf(stdout,"End of the test for batch: %-10.10s\n", bctx->batch_name); 
-  fprintf(stdout,"======================================================"
-          "=================================\n\n");
-  
-  now = get_tick_count();
-
-  const int seconds_run = (int)(now - bctx->start_time)/ 1000;
-  if (!seconds_run)
-    return;
-  
-  fprintf(stdout,"\nTest total duration was %d seconds and CAPS average %ld:\n", 
-          seconds_run, bctx->op_total.call_init_count / seconds_run);
-
-  dump_statistics (seconds_run, 
-                   &bctx->http_total,
-                   &bctx->https_total);
-
-
-  for (i = 0; i <= threads_subbatches_num; i++)
-    {
-      if (i)
-        {
-          op_stat_point_add (&bctx->op_delta, &(bctx + i)->op_delta );
-          
-          /* Other threads operational statistics - reset just after collecting */
-          op_stat_point_reset (&(bctx + i)->op_delta);
-        }
-    }
-  op_stat_point_add (&bctx->op_total, &bctx->op_delta);
-  
-  print_operational_statistics (bctx->opstats_file,
-                                &bctx->op_delta, 
-                                &bctx->op_total, 
-                                bctx->url_ctx_array);
-
-
-  if (bctx->statistics_file)
-    {
-
-      print_statistics_footer_to_file (bctx->statistics_file);
-      print_statistics_header (bctx->statistics_file);
-
-      const unsigned long loading_t = now - bctx->start_time;
-      const unsigned long loading_time = loading_t ? loading_t : 1;
- 
-      print_statistics_data_to_file (bctx->statistics_file,
-				     loading_time/1000,
-				     UNSECURE_APPL_STR,
-				     pending_active_and_waiting_clients_num_stat (bctx),
-				     &bctx->http_total,
-				     loading_time);
-			
-      print_statistics_data_to_file (bctx->statistics_file, 
-				     loading_time/1000,
-				     SECURE_APPL_STR,
-				     pending_active_and_waiting_clients_num_stat (bctx),
-				     &bctx->https_total,
-				     loading_time);
-    }
-
-  dump_clients (cctx);
-  (void)fprintf (stderr, "\nExited. For details look in the files:\n"
-           "- %s.log for errors and traces;\n"
-           "- %s.txt for loading statistics;\n"
-           "- %s.ctx for virtual client based statistics.\n",
-	   bctx->batch_name, bctx->batch_name, bctx->batch_name);
-  if (bctx->dump_opstats)
-      (void)fprintf (stderr,"- %s.ops for operational statistics.\n",
-      bctx->batch_name);
-  (void)fprintf (stderr, 
-           "Add -v and -u options to the command line for "
-	   "verbose output to %s.log file.\n",bctx->batch_name);
-}
-
 /******
 * Function name - ascii_time
 *
@@ -464,6 +319,7 @@ char *ascii_time (char *tbuf)
   return ctime_r(&timeb,tbuf);
 }
 
+#if 0
 /****************************************************************************************
 * Function name - dump_snapshot_interval
 *
@@ -549,7 +405,6 @@ void dump_snapshot_interval (batch_context* bctx, unsigned long now)
           "=====================\n");
   fflush (stdout);
 }
-
 /****************************************************************************************
 * Function name - print_snapshot_interval_statistics
 *
@@ -572,112 +427,6 @@ void print_snapshot_interval_statistics (unsigned long period,
 
   dump_stat_to_screen (UNSECURE_APPL_STR, http, period);
   dump_stat_to_screen (SECURE_APPL_STR, https, period);
-}
-
-
-/****************************************************************************************
-* Function name - dump_snapshot_interval_and_advance_total_statistics
-*
-* Description - Dumps snapshot_interval statistics for the latest loading time 
-*               period and adds this statistics to the total loading counters. 
-*
-* Input -       *bctx    - pointer to batch context
-*               now_time - current time in msec since the epoch
-*
-* Return Code/Output - None
-****************************************************************************************/
-void dump_snapshot_interval_and_advance_total_statistics (batch_context* bctx,
-                                                          unsigned long now_time,
-                                                          int clients_total_num)
-{
-  int i;
-  const unsigned long delta_t = now_time - bctx->last_measure; 
-  const unsigned long delta_time = delta_t ? delta_t : 1;
-
-  if (stop_loading)
-    {
-      dump_final_statistics (bctx->cctx_array);
-      screen_release ();
-      exit (1); 
-    }
-
-  fprintf(stdout,"============  loading batch is: %-10.10s ===================="
-          "==================\n",
-          bctx->batch_name);
-
-  /*Collect the operational statistics*/
-
-  for (i = 0; i <= threads_subbatches_num; i++)
-    {
-      if (i)
-        {
-          op_stat_point_add (&bctx->op_delta, &(bctx + i)->op_delta );
-
-          /* Other threads operational statistics - reset just after collecting */
-          op_stat_point_reset (&(bctx + i)->op_delta);
-        }
-    }
-
-  op_stat_point_add (&bctx->op_total, &bctx->op_delta );
-
-  print_operational_statistics (bctx->opstats_file,
-                                &bctx->op_delta,
-                                &bctx->op_total, 
-                                bctx->url_ctx_array);
-
-
-  fprintf(stdout,"--------------------------------------------------------------------------------\n");
-
-  fprintf(stdout,"Interval stats (latest:%ld sec, clients:%d, CAPS-curr:%ld):\n",
-          (unsigned long ) delta_time/1000, clients_total_num,
-          bctx->op_delta.call_init_count* 1000/delta_time);
-
-  op_stat_point_reset (&bctx->op_delta);
-
-
-  for (i = 0; i <= threads_subbatches_num; i++)
-    {
-      if (i)
-        {
-          stat_point_add (&bctx->http_delta, &(bctx + i)->http_delta);
-          stat_point_add (&bctx->https_delta, &(bctx + i)->https_delta);
-
-          /* Other threads statistics - reset just after collecting */
-          stat_point_reset (&(bctx + i)->http_delta); 
-          stat_point_reset (&(bctx + i)->https_delta);
-        }
-    }
-
-  stat_point_add (&bctx->http_total, &bctx->http_delta);
-  stat_point_add (&bctx->https_total, &bctx->https_delta);
-
-  print_snapshot_interval_statistics(delta_time, 
-                                     &bctx->http_delta,  
-                                     &bctx->https_delta);
-
-  if (bctx->statistics_file)
-    {
-      const unsigned long timestamp_sec =  (now_time - bctx->start_time) / 1000;
-
-      print_statistics_data_to_file (bctx->statistics_file,
-                                     timestamp_sec,
-                                     UNSECURE_APPL_STR,
-                                     clients_total_num,
-                                     &bctx->http_delta,
-                                     delta_time);
-    
-      print_statistics_data_to_file (bctx->statistics_file, 
-                                     timestamp_sec,
-                                     SECURE_APPL_STR, 
-                                     clients_total_num,
-                                     &bctx->https_delta,
-                                     delta_time);
-    }
-
-  stat_point_reset (&bctx->http_delta); 
-  stat_point_reset (&bctx->https_delta);
-        
-  bctx->last_measure = now_time;
 }
 
 /****************************************************************************************
@@ -707,7 +456,6 @@ static void dump_statistics (unsigned long period,
   dump_stat_to_screen (SECURE_APPL_STR, https, period);
 }
 
-
 /****************************************************************************************
 * Function name - dump_stat_to_screen
 *
@@ -732,6 +480,7 @@ static void dump_stat_to_screen (char* protocol,
     //fprintf (stdout, "Appl-Delay-Points %d, Appl-Delay-2xx-Points %d \n", 
   //         sd->appl_delay_points, sd->appl_delay_2xx_points);
 }
+#endif
 
 /****************************************************************************************
 * Function name - print_statistics_header
@@ -798,6 +547,7 @@ static void print_statistics_data_to_file (FILE* file,
     fflush (file);
 }
 
+#if 0
 /****************************************************************************************
 * Function name - dump_clients
 *
@@ -835,6 +585,7 @@ static void dump_clients (client_context* cctx_array)
 
   fclose (ct_file);
 }
+#endif
 
 /***********************************************************************************
 * Function name - print_operational_statistics
@@ -873,3 +624,162 @@ static void print_operational_statistics (FILE *opstats_file,
         }
     }
 }
+
+
+void generate_final_log (batch_context* bctx)
+{
+  int i;
+  //batch_context* bctx = cctx->bctx;
+  unsigned long now = get_tick_count();
+#if 0
+  for (i = 0; i <= threads_subbatches_num; i++)
+    {
+      if (i)
+        {
+          stat_point_add (&bctx->http_delta, &(bctx + i)->http_delta);
+          stat_point_add (&bctx->https_delta, &(bctx + i)->https_delta);
+          
+          /* Other threads statistics - reset just after collecting */
+          stat_point_reset (&(bctx + i)->http_delta); 
+          stat_point_reset (&(bctx + i)->https_delta);
+        }
+    }
+  
+  print_snapshot_interval_statistics (now - bctx->last_measure,
+		&bctx->http_delta,  
+		&bctx->https_delta);
+
+  stat_point_add (&bctx->http_total, &bctx->http_delta);
+  stat_point_add (&bctx->https_total, &bctx->https_delta); 
+    
+  fprintf(stdout,"\n==================================================="
+          "====================================\n");
+  fprintf(stdout,"End of the test for batch: %-10.10s\n", bctx->batch_name); 
+  fprintf(stdout,"======================================================"
+          "=================================\n\n");
+  
+  now = get_tick_count();
+
+  const int seconds_run = (int)(now - bctx->start_time)/ 1000;
+  if (!seconds_run)
+    return;
+  
+  fprintf(stdout,"\nTest total duration was %d seconds and CAPS average %ld:\n", 
+          seconds_run, bctx->op_total.call_init_count / seconds_run);
+
+  dump_statistics (seconds_run, 
+                   &bctx->http_total,
+                   &bctx->https_total);
+
+#endif
+if (!bctx->log_enable)
+{
+	return;
+}
+
+  for (i = 0; i <= threads_subbatches_num; i++)
+    {
+      if (i)
+        {
+          op_stat_point_add (&bctx->op_delta, &(bctx + i)->op_delta );
+          
+          /* Other threads operational statistics - reset just after collecting */
+          op_stat_point_reset (&(bctx + i)->op_delta);
+        }
+    }
+  op_stat_point_add (&bctx->op_total, &bctx->op_delta);
+
+
+	  print_operational_statistics (bctx->opstats_file,
+	                                &bctx->op_delta, 
+	                                &bctx->op_total, 
+	                                bctx->url_ctx_array);
+  
+	    if (bctx->statistics_file)
+	    {
+	      print_statistics_footer_to_file (bctx->statistics_file);
+	      print_statistics_header (bctx->statistics_file);
+
+	      const unsigned long loading_t = now - bctx->start_time;
+	      const unsigned long loading_time = loading_t ? loading_t : 1;
+	 
+	      print_statistics_data_to_file (bctx->statistics_file,
+					     loading_time/1000,
+					     "H/F",
+					     pending_active_and_waiting_clients_num_stat (bctx),
+					     &bctx->http_total,
+					     loading_time);
+				
+	      print_statistics_data_to_file (bctx->statistics_file, 
+					     loading_time/1000,
+					     "H/F/S",
+					     pending_active_and_waiting_clients_num_stat (bctx),
+					     &bctx->https_total,
+					     loading_time);
+	    }
+
+  	   //dump_clients (cctx);
+	 
+	  (void)fprintf (stderr, "\nExited. For details look in the files:\n"
+	           "- %s.log for errors and traces;\n"
+	           "- %s.txt for loading statistics;\n"
+	           "- %s.ctx for virtual client based statistics.\n",
+		   bctx->batch_name, bctx->batch_name, bctx->batch_name);
+	  //if (bctx->dump_opstats)
+	      (void)fprintf (stderr,"- %s.ops for operational statistics.\n",
+	      bctx->batch_name);
+	  (void)fprintf (stderr, 
+	           "Add -v and -u options to the command line for "
+		   "verbose output to %s.log file.\n",bctx->batch_name);
+
+	  return;
+}
+
+
+
+/****************************************************************************************
+* Function name - dump_snapshot_interval_and_advance_total_statistics
+*
+* Description - Dumps snapshot_interval statistics for the latest loading time 
+*               period and adds this statistics to the total loading counters. 
+*
+* Input -       *bctx    - pointer to batch context
+*               now_time - current time in msec since the epoch
+*
+* Return Code/Output - None
+****************************************************************************************/
+void generate_cycle_log (batch_context* bctx, unsigned long now_time, int clients_total_num)
+{
+	const unsigned long delta_t = now_time - bctx->last_measure; 
+	const unsigned long delta_time = delta_t ? delta_t : 1;
+
+	if (bctx->log_enable)
+	{
+		print_operational_statistics (bctx->opstats_file, &bctx->op_delta, &bctx->op_total, bctx->url_ctx_array);
+	}
+
+	if (bctx->log_enable && bctx->statistics_file)
+	{
+		const unsigned long timestamp_sec =  (now_time - bctx->start_time) / 1000;
+
+		print_statistics_data_to_file (bctx->statistics_file,
+		                             timestamp_sec,
+		                             "H/F",
+		                             clients_total_num,
+		                             &bctx->http_delta,
+		                             delta_time);
+
+		print_statistics_data_to_file (bctx->statistics_file, 
+		                             timestamp_sec,
+		                             "H/F/S", 
+		                             clients_total_num,
+		                             &bctx->https_delta,
+		                             delta_time);
+	}
+
+	op_stat_point_reset (&bctx->op_delta);
+
+	return;       
+}
+
+

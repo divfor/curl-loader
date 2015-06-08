@@ -76,25 +76,23 @@ static int fetching_first_cycling_url (client_context* cctx);
 static void advance_cycle_num (client_context* cctx);
 static int setup_url (client_context* cctx);
 
+#if 0
 static int handle_screen_input_timer (timer_node* tn, 
                                       void* pvoid_param, 
                                       unsigned long ulong_param);
 static int handle_logfile_rewinding_timer (timer_node* tn, 
                                            void* pvoid_param, 
                                            unsigned long ulong_param);
+#endif
 static int 
-handle_gradual_increase_clients_num_timer (timer_node* tn,
-                                           void* pvoid_param, 
-                                           unsigned long ulong_param);
-static int handle_cctx_sleeping_timer (timer_node* tn,
-                                void* pvoid_param, 
-                                unsigned long ulong_param);
-static int handle_cctx_url_completion_timer (timer_node* tn,
-                                             void* pvoid_param, 
-                                             unsigned long ulong_param);
+handle_gradual_increase_clients_num_timer (timer_node* tn, void* pvoid_param, unsigned long ulong_param);
+static int handle_cctx_sleeping_timer (timer_node* tn, void* pvoid_param, unsigned long ulong_param);
+static int handle_cctx_url_completion_timer (timer_node* tn, void* pvoid_param, unsigned long ulong_param);
+#if 0
 static int handle_req_rate_timer (timer_node* tn,
                                   void* pvoid_param, 
                                   unsigned long ulong_param);
+#endif
 static int client_remove_from_load (batch_context* bctx, 
 				    client_context* cctx);
 static int client_add_to_load (batch_context* bctx, 
@@ -102,9 +100,10 @@ static int client_add_to_load (batch_context* bctx,
                                unsigned long now_time);
 static int fetching_decision (client_context* cctx, url_context* url);
 static int orderly_sched_clients (batch_context* bctx, int clients_to_sched);
+#if 0
 static int req_rate_sched_clients (batch_context* bctx);
 static int get_free_client (batch_context* bctx, client_context **pcctx);
-
+#endif
 
 
 /*****************************************************************************
@@ -161,6 +160,7 @@ int init_timers_and_add_initial_clients_to_load (batch_context* bctx,
 {
   //client_context* cctx = bctx->cctx_array;
 
+#if 0
     /* 
      Init logfile rewinding timer and schedule it.
   */
@@ -177,6 +177,7 @@ int init_timers_and_add_initial_clients_to_load (batch_context* bctx,
       fprintf (stderr, "%s - error: tq_schedule_timer () failed.\n", __func__);
       return -1;
     }
+  #endif
 #if 0
    else
     {
@@ -185,6 +186,7 @@ int init_timers_and_add_initial_clients_to_load (batch_context* bctx,
     }
 #endif
 
+#if 0
   /* 
      Init screen input testing timer and schedule it.
   */
@@ -197,6 +199,7 @@ int init_timers_and_add_initial_clients_to_load (batch_context* bctx,
       fprintf (stderr, "%s - error: tq_schedule_timer () failed.\n", __func__);
       return -1;
     }
+#endif
 #if 0  
   else
     {
@@ -241,6 +244,7 @@ int init_timers_and_add_initial_clients_to_load (batch_context* bctx,
 #endif
     }
 
+#if 0
   if (bctx->req_rate)
     {
       /* 
@@ -258,6 +262,7 @@ int init_timers_and_add_initial_clients_to_load (batch_context* bctx,
           return -1;
         }
     }
+  #endif
   return 0;
 }
 
@@ -396,7 +401,8 @@ int load_next_step (client_context* cctx,
     Coming to the error or the finished states, just return without more 
     scheduling the client any more.
   */
-  if (rval_load == CSTATE_ERROR || rval_load == CSTATE_FINISHED_OK)
+  //if (rval_load == CSTATE_ERROR || rval_load == CSTATE_FINISHED_OK)
+  if (rval_load == CSTATE_FINISHED_OK)
   {
       /*
         GF 
@@ -416,12 +422,14 @@ int load_next_step (client_context* cctx,
           cctx->handle = 0;
       }
 
+#if 0
       if (rval_load == CSTATE_ERROR)
       {
           // Re-init clients in CSTATE_ERROR state to enable their optional
           // scheduling
           cctx->handle = curl_easy_init ();
       }
+#endif	  
       return rval_load;
   }
 
@@ -445,10 +453,7 @@ int load_next_step (client_context* cctx,
     }
   else
     {
-        //PRINTF("load_next_step: ctx %p schedule next load in %d seconds\n", 
-        //     cctx,(int) interleave_waiting_time/1000);
-
-      /* 
+   /* 
          Postpone client scheduling for the interleave_waiting_time msec by 
          placing it to the timer queue. Schedule the timer now.
       */
@@ -547,11 +552,11 @@ int add_loading_clients (batch_context* bctx)
      URL, etc. parameters and adding it to MCURL multi-handle.
      Defer activation to timer if fixed request rate is specified.
   */
-  if (!bctx->req_rate)
-    {
+  //if (!bctx->req_rate)
+    //{
       if (orderly_sched_clients (bctx, clients_to_sched) < 0)
           return -1;
-    }
+    //}
 
   /* 
      Re-calculate assisting counters and enable do_client_num_gradual_increase 
@@ -604,11 +609,11 @@ int add_loading_clients_num (batch_context* bctx, int add_number)
      URL, etc. parameters and adding it to MCURL multi-handle.
      Defer activation to timer if fixed request rate is specified.
   */
-  if (!bctx->req_rate)
-    {
+  //if (!bctx->req_rate)
+    //{
       if (orderly_sched_clients (bctx, clients_to_sched) < 0)
           return -1;
-    }
+    //}
 
   bctx->clients_current_sched_num += clients_to_sched;
 	
@@ -810,6 +815,7 @@ static int handle_gradual_increase_clients_num_timer (timer_node* timer_node,
   return 0;
 }
 
+#if 0
 /****************************************************************************************
  * Function name - handle_logfile_rewinding_timer
  *
@@ -838,7 +844,8 @@ static int handle_logfile_rewinding_timer (timer_node* timer_node,
   //fprintf (stderr, "%s - runs.\n", __func__);
   return 0;
 }
-
+#endif
+#if 0
 /******************************************************************************
  * Function name - handle_screen_input_timer
  *
@@ -863,7 +870,7 @@ static int handle_screen_input_timer (timer_node* timer_node,
   //fprintf (stderr, "%s - runs.\n", __func__);
   return 0;
 }
-
+#endif
 /*************************************************************************
  * Function name - handle_cctx_sleeping_timer
  *
@@ -907,6 +914,7 @@ int handle_cctx_sleeping_timer (timer_node* tn,
   return client_add_to_load (bctx, cctx, now_time);
 }
 
+#if 0
 /*****************************************************************************
  * Function name - put_free_client
  *
@@ -946,6 +954,7 @@ int put_free_client (client_context* cctx)
   bctx->free_clients[bctx->free_clients_count++] = free_client_no;
   return 0;
 }
+#endif
 
 /*************************************************************************
  * Function name - handle_cctx_url_completion_timer
@@ -980,7 +989,7 @@ static int handle_cctx_url_completion_timer (timer_node* tn,
   cctx->client_state = CSTATE_ERROR;
 
   const unsigned long now_time = get_tick_count ();
-  if (verbose_logging)
+  if (verbose_logging && bctx->log_enable)
     {
       fprintf (cctx->file_output, 
                "%ld %ld %ld %s !! ERUT url completion timeout: url: %s\n", 
@@ -994,10 +1003,13 @@ static int handle_cctx_url_completion_timer (timer_node* tn,
     If fixed request rate is specified, free the client, the next step
     is loaded on the request rate timer.
   */
-  return (bctx->req_rate) ? put_free_client(cctx) :
-    load_next_step(cctx, now_time, &sched_now);
+  //return (bctx->req_rate) ? put_free_client(cctx) :
+    //load_next_step(cctx, now_time, &sched_now);
+return load_next_step(cctx, now_time, &sched_now);
+	
 }
 
+#if 0
 /*************************************************************************
  * Function name - handle_req_rate_timer
  *
@@ -1020,7 +1032,7 @@ static int handle_req_rate_timer (timer_node* tn,
   (void)req_rate_sched_clients(bctx);
   return 0;
 }
-
+#endif
 /****************************************************************************************
  * Function name - pending_active_and_waiting_clients_num
  *
@@ -1032,8 +1044,11 @@ static int handle_req_rate_timer (timer_node* tn,
  ****************************************************************************************/
 int pending_active_and_waiting_clients_num (batch_context* bctx)
 {
+
+#if 0
   if (bctx->req_rate && (bctx->cycling_completed || bctx->requests_completed))
     return 0;
+#endif
   int total = bctx->waiting_queue ? 
     (bctx->active_clients_count + bctx->sleeping_clients_count) :
     bctx->active_clients_count;
@@ -1042,8 +1057,9 @@ int pending_active_and_waiting_clients_num (batch_context* bctx)
    is specified, and clients are scheduled, ie. the request rate timer did
    not run yet.
   */
-  return total ? total : (int)(
-    bctx->req_rate && bctx->clients_current_sched_num);
+  //return total ? total : (int)(
+    //bctx->req_rate && bctx->clients_current_sched_num);
+ return total;
 }
 
 /****************************************************************************************
@@ -1059,8 +1075,10 @@ int pending_active_and_waiting_clients_num (batch_context* bctx)
 int pending_active_and_waiting_clients_num_stat (batch_context* bctx)
 {
   int total = pending_active_and_waiting_clients_num (bctx);
+#if 0
   if (bctx->req_rate)
       total = bctx->client_num_max - bctx->free_clients_count;
+#endif
   return total;
 }
 
@@ -1330,8 +1348,8 @@ static int load_urls_state (client_context* cctx,
   url_context* url = &bctx->url_ctx_array[cctx->url_curr_index];
   int url_next = -1;
 
-cctx->is_reconnect=(get_prob() <= url->fresh_connect)?1:0;
-  
+  cctx->is_reconnect=(get_prob() <= url->fresh_connect)?1:0;
+
   if (cctx->client_state == CSTATE_URLS)
     {
       // Mind the after url sleeping timeout, if any.
@@ -1438,6 +1456,7 @@ static int orderly_sched_clients (batch_context* bctx,
   return 0;
 }
 
+#if 0
 /*****************************************************************************
  * Function name - req_rate_sched_clients
  *
@@ -1489,7 +1508,6 @@ static int req_rate_sched_clients (batch_context* bctx)
     }
   return 0;
 }
-
 /*****************************************************************************
  * Function name - get_free_client
  *
@@ -1519,3 +1537,7 @@ static int get_free_client (batch_context* bctx,
   *pcctx = bctx->cctx_array + free_client_no - 1;
   return 0;
 }
+#endif
+
+
+

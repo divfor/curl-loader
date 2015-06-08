@@ -64,6 +64,7 @@ int test_environment (batch_context* bctx)
       return -1;
     }
 
+#if 0
   /* 
      Protection of the smooth and storm modes from select fd_set smashing.
   */
@@ -83,7 +84,7 @@ int test_environment (batch_context* bctx)
           return -1;
       }
   }
-
+#endif
   /* 
      Suggestion to increase the current descriptor limit
      and/or recycle sockets

@@ -127,8 +127,6 @@ typedef struct client_context
   size_t client_index;
 
   /*simon*/
-  char* client_credentials;
-  int client_credentials_index;
   long is_reconnect;
 
   /* Index of the currently used url. */
