@@ -405,7 +405,7 @@ void cc_set_credentials_for_client(client_context*const cctx)
 		curl_easy_setopt (handle, CURLOPT_FOLLOWLOCATION, 1);
 		curl_easy_setopt (handle, CURLOPT_UNRESTRICTED_AUTH, 1);
 
-		curl_easy_setopt(handle, CURLOPT_HTTPAUTH, bctx->proxy_auth_method);
+		curl_easy_setopt(handle, CURLOPT_HTTPAUTH, bctx->proxy_auth_method|CURLAUTH_ONLY);
 		if (bctx->proxy_auth_method == CURLAUTH_GSSNEGOTIATE)
 		{
 			curl_easy_setopt(handle, CURLOPT_USERPWD, bctx->client_principle_name_array[index_based_on_ip]);
@@ -417,7 +417,7 @@ void cc_set_credentials_for_client(client_context*const cctx)
 	}
 	else
 	{
-		curl_easy_setopt(handle, CURLOPT_PROXYAUTH, bctx->proxy_auth_method);	
+		curl_easy_setopt(handle, CURLOPT_PROXYAUTH, bctx->proxy_auth_method|CURLAUTH_ONLY);	
 		if (bctx->proxy_auth_method == CURLAUTH_GSSNEGOTIATE)
 		{
 			//printf ("pn=%s\n", bctx->client_principle_name_array[index_based_on_ip]);

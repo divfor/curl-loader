@@ -51,6 +51,8 @@ int test_environment (batch_context* bctx)
   
   ret = getrlimit(RLIMIT_NOFILE, &file_limit);
 
+#if 0
+
   /* 
      Limit of descriptors is less, than the number of clients.
   */
@@ -64,7 +66,6 @@ int test_environment (batch_context* bctx)
       return -1;
     }
 
-#if 0
   /* 
      Protection of the smooth and storm modes from select fd_set smashing.
   */
@@ -91,8 +92,18 @@ int test_environment (batch_context* bctx)
   */
   if (!ret && file_limit.rlim_cur <= (unsigned int) (2*bctx->client_num_max))
   {
+   file_limit.rlim_cur = OPEN_FDS_SUGGESTION;
+   file_limit.rlim_max = OPEN_FDS_SUGGESTION;
+
+	ret = setrlimit(RLIMIT_NOFILE, &file_limit);
+	if (ret != 0)
+	{
+		fprintf (stderr, "test_environment error: Set resource limit error.\n");
+	}
+
     if (!warnings_skip)
       {
+	  	#if 0
         fprintf(stderr,
                 "WARNING - NOTE: the current limit of open descriptors \n" 
                 "for the shell (%d) is higher than number of clients in the batch (%d).\n"
@@ -100,7 +111,7 @@ int test_environment (batch_context* bctx)
                 "of the sockets may be not enough.\n"
                 "Consider, increasing the limit, e.g. by running   ulimit -n %d\n",
                 (int)(file_limit.rlim_cur), bctx->client_num_max, OPEN_FDS_SUGGESTION);
-        
+        #endif
         if (file_limit.rlim_cur > 5000)
           {
             fprintf(stderr, "and/or changing temporarily TCP stack defaults by running as a su:\n"

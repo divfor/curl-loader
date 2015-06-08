@@ -141,7 +141,7 @@ static void prepare_reporting_data(batch_context* bctx, unsigned long now)
 int connect_redis_server(batch_context* bctx)
 {
 	struct timeval timeout = { 1, 500000 };   /* 1.5 seconds */
-	redisReply *reply;
+	//redisReply *reply;
 
 	bctx->redis_handle = redisConnectWithTimeout(bctx->redis_server, bctx->redis_port, timeout);
 	if (bctx->redis_handle == NULL || bctx->redis_handle->err) 
@@ -162,8 +162,8 @@ int connect_redis_server(batch_context* bctx)
 	}
 
 	/*Add the hostname to a set*/
-	reply = redisCommand(bctx->redis_handle,"SADD hostname_set %s", bctx->cl_hostname);
-	freeReplyObject(reply);
+	//reply = redisCommand(bctx->redis_handle,"SADD hostname_set %s", bctx->cl_hostname);
+	//freeReplyObject(reply);
 
 	return 0;
 }
@@ -330,10 +330,10 @@ static void send_statistics_to_redis (batch_context* bctx)
 	assert (bctx->redis_handle != NULL);
 	rs_output_itoa (rs_output);
 
-	reply = redisCommand(bctx->redis_handle, "SETEX %s_ttl %s %s", bctx->cl_hostname, rs_output->s_redis_keepalive_secs, rs_output->s_redis_keepalive_secs);
-	freeReplyObject(reply);
+	//reply = redisCommand(bctx->redis_handle, "SETEX %s_ttl %s %s", bctx->cl_hostname, rs_output->s_redis_keepalive_secs, rs_output->s_redis_keepalive_secs);
+	//freeReplyObject(reply);
 
-	reply = redisCommand(bctx->redis_handle, "HMSET %s batch_name %s total_client %s cycle_interval %s hf_request_num %s hfs_request_num %s caps_current %s  \
+	reply = redisCommand(bctx->redis_handle, "HMSET %s_reporting batch_name %s total_client %s cycle_interval %s hf_request_num %s hfs_request_num %s caps_current %s  \
         hf_1xx %s hf_2xx %s hf_3xx %s hf_4xx %s hf_5xx %s hf_err %s hf_t_err %s hf_delay %s hf_delay_2xx %s hf_input_traffic %s hf_output_traffic %s  \
         hfs_1xx %s hfs_2xx %s hfs_3xx %s hfs_4xx %s hfs_5xx %s hfs_err %s hfs_t_err %s hfs_delay %s hfs_delay_2xx %s hfs_input_traffic %s hfs_output_traffic %s  \
         total_duration %s total_hf_request_num %s total_hfs_request_num %s average_caps %s  \
@@ -418,6 +418,7 @@ static void send_statistics_to_redis (batch_context* bctx)
 static void print_statistics_to_screen(batch_context* bctx)
 {
 	redis_statistics_output *rs_output=&(bctx->rs_output);
+	fprintf(stdout, "\033[2J");
 	
 	fprintf(stdout,"=======================================  loading batch is: %-10.10s  =======================================\n",bctx->batch_name);
 	fprintf(stdout,"------------------------------------------------------------------------------------------------------------\n");
@@ -482,11 +483,6 @@ static void generate_final_reporting (batch_context* bctx, unsigned long now)
 
 void generate_cycle_reporting(batch_context* bctx, unsigned long now)
 {
-	if (!stop_loading)
-	{
-		fprintf(stdout, "\033[2J");
-	}
-
 	if (stop_loading)
 	{
 		generate_final_reporting (bctx, now);
@@ -494,7 +490,6 @@ void generate_cycle_reporting(batch_context* bctx, unsigned long now)
 		exit (1); 
 	}
 
-	
 	prepare_reporting_data (bctx, now);
 	if (bctx->reporting_way == CONSOLE_REPORTING)
 	{

@@ -513,7 +513,7 @@ static int rtnl_talk(struct rtnl_handle *rtnl,
                         memcpy(answer, h, h->nlmsg_len);
                       return 0;
                     }
-                  perror("rtnl_talk(): RTNETLINK answers");
+                  //perror("rtnl_talk(): RTNETLINK answers");
                 }
               return -1;
             }

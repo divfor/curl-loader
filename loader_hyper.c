@@ -504,6 +504,11 @@ int user_activity_hyper (client_context* cctx_array)
          curl_multi_socket_all(bctx->multiple_handle, &st))
          ;
 
+ if (is_batch_group_leader (bctx))
+ {
+  fprintf (stderr, "Done.\n");
+ }
+
   evtimer_set (bctx->timer_next_load_event, next_load_cb_hyper, bctx);
   event_base_set(bctx->eb, bctx->timer_next_load_event);
   
@@ -626,15 +631,16 @@ static int mperform_hyper (batch_context* bctx, int* still_running)
     
   now_time = get_tick_count ();
 
-  if ((long)(now_time - bctx->last_measure) > snapshot_timeout) 
-    {
-      if (is_batch_group_leader (bctx))
-        {
+  if (is_batch_group_leader (bctx))
+  {
+	  if ((long)(now_time - bctx->last_measure) > snapshot_timeout) 
+	    {
           //dump_snapshot_interval (bctx, now_time);
           generate_cycle_reporting(bctx, now_time);
-        }
-    }
-
+	        
+	    }
+  }
+  
   while( (msg = curl_multi_info_read (mhandle, &msg_num)) != 0)
     {
       if (msg->msg == CURLMSG_DONE)

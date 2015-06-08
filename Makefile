@@ -13,7 +13,6 @@ LD=gcc
 
 #C Compiler Flags
 CFLAGS=-W -Wall -Wpointer-arith -pipe -DCURL_LOADER_FD_SETSIZE=20000 -D_FILE_OFFSET_BITS=64
-#       -fno-builtin-malloc -fno-builtin-calloc -fno-builtin-realloc -fno-builtin-free
 
 debug ?= 0
 optimize ?= 1

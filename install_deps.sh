@@ -5,11 +5,12 @@ GSSCRED_CACHE_VER=0.1
 HEIMDAL_VER=1.5.3.107
 OPENSSL_VER=1.0.1e
 FBOPENSSL_VER=0.0.4.106
-CARES_VER=1.10.0
+CARES_VER=1.7.5
 #LIBEVENT_VER=2.0.21-stable
 LIBEVENT_VER=1.4.14b-stable
 #CURL_VER=7.33.0.107
 CURL_VER=7.24.0.107
+#CURL_VER=7.34.0
 #CURL_VER=bad
 HIREDIS_VER=0.11.0
 
@@ -100,6 +101,28 @@ make_cleanall(){
     undo_ld_path
 }
 
+cleanall_on_cl_version(){
+    installed_ver_str=`curl-loader -V 2>&1|head -1`
+
+    #Check if it support the command argument  -V
+    if [ "${installed_ver_str:0:17}" = "Curl-loader 0.56." ]; then
+        installed_ver_num=`echo "$installed_ver_str" | awk '{print $2}' | awk -F '.' '{print $3}'`
+        fbopenssl_ver=`echo $FBOPENSSL_VER | awk -F"." '{print $NF}'`
+        heimdal_ver=`echo $HEIMDAL_VER | awk -F"." '{print $NF}'`
+        curl_ver=`echo $CURL_VER | awk -F"." '{print $NF}'`
+
+        #To get the maxmium verison numbs of curl, heimdal, fbopenssl
+        #max_ver_num=`echo "$heimdal_ver 109 $fbopenssl_ver 110 103"|cut -f1 -d" "|sort -n`
+        max_ver_num=`echo $heimdal_ver $fbopenssl_ver $curl_ver | awk 'BEGIN {max=0} {for(i=1;i<=NF;i++) if ($i>max) max=$i fi} END {print max}'`
+        #If the installed num is older(less than) to max_ver, need to clean installed libs
+        if [ $installed_ver_num -lt $max_ver_num ]; then
+            rm -rf $INSTALL_PATH
+        fi
+    else  #The version is less than 0.56.102, so need to clean installed libs
+        rm -rf $INSTALL_PATH
+    fi
+}
+
 compile_option(){    #$1:  debug switch
     if [ $1 -eq 1 ]; then
         FRED_HASH_OPT_FLAGS="debug=1"
@@ -129,7 +152,7 @@ make_openssl(){
         cd openssl-$OPENSSL_VER/; 
         ./config --prefix=$OPENSSL_INSTALL_PATH no-rc2 no-md2 no-ssl2 no-idea no-mdc2 no-rc5 enable-tlsext \
                  no-krb5 threads shared;      #CFLAGS="$OPENSSL_OPT_FLAGS";
-        make; make install; config_ld_path $OPENSSL_LIB_PATH;
+        make || exit 1; make install; config_ld_path $OPENSSL_LIB_PATH;
         cd ../..
     fi
 }
@@ -172,7 +195,7 @@ make_heimdal(){
         ./configure --prefix=$HEIMDAL_INSTALL_PATH --enable-pthread-support=yes --disable-sqlite-cache --disable-heimdal-documentation  \
                     --without-ipv6 --without-sqlite3 --without-openldap CFLAGS="$HEIMDAL_OPT_FLAGS"     \
                     LDFLAGS="-L$DNS_CACHE_LIB_PATH" LIBS="-ldnscache" CPPFLAGS="-I$DNS_CACHE_INCLUDE_PATH";
-        make; make install; config_ld_path $HEIMDAL_LIB_PATH;
+        make || exit 1; make install; config_ld_path $HEIMDAL_LIB_PATH;
         cd ../..
     fi
 }
@@ -222,7 +245,7 @@ make_curl(){
                            --with-spnego=$FBOPENSSL_LIB_PATH --enable-shared=no --enable-ares=$CARES_INSTALL_PATH  \
                           LDFLAGS="-L$GSSCRED_CACHE_LIB_PATH" LIBS="-lgsscredcache"  \
                           CPPFLAGS="-I$CL_INCLUDE_PATH -DCURL_MAX_WRITE_SIZE=4096" CFLAGS="$CURL_OPT_FLAGS" ;
-        make; make install;
+        make || exit 1; make install;
         cd ../..
     fi
 }
@@ -264,7 +287,7 @@ install_all(){    #$1: debug switch
     check_platform
     compile_option $1
 
-    rm -rf $INSTALL_PATH
+    cleanall_on_cl_version
 
     make_openssl
     make_fred_hash

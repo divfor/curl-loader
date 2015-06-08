@@ -3017,7 +3017,7 @@ static int post_validate_init (batch_context*const bctx)
   /* 
      It should be the last check.
   */
-  fprintf (stderr, "\nThe configuration has been post-validated successfully.\n\n");
+  //fprintf (stderr, "\nThe configuration has been post-validated successfully.\n\n");
 
   /* 
      Check, that this configuration has cycling. 
@@ -3163,8 +3163,8 @@ int parse_config_file (char* const filename,
     }
   else
     {
-      fprintf (stderr, "%s - loaded %d batches\n", 
-               __func__, batch_index + 1);
+      //fprintf (stderr, "%s - loaded %d batches\n", 
+      //         __func__, batch_index + 1);
     }
 
   int k = 0;
