@@ -14,9 +14,9 @@ LD=gcc
 #C Compiler Flags
 CFLAGS=-W -Wall -Wpointer-arith -pipe -DCURL_LOADER_FD_SETSIZE=20000 -D_FILE_OFFSET_BITS=64
 
-debug ?= 0
+debug ?= 1
 optimize ?= 1
-profile ?= 0
+profile ?= 1
 
 #Debug flags
 ifeq ($(debug),1)
@@ -62,7 +62,7 @@ INCDIR=-I. -I./inc
 all: $(TARGET)
 
 $(TARGET): $(OBJ)
-	$(LD) $(CFLAGS)$(PROF_FLAG) $(DEBUG_FLAGS) $(OPT_FLAGS) -o $@ $(OBJ) $(DYN_LIBS) $(STATIC_LIBS)
+	$(LD) $(CFLAGS) $(PROF_FLAG) $(DEBUG_FLAGS) $(OPT_FLAGS) -o $@ $(OBJ) $(DYN_LIBS) $(STATIC_LIBS)
 
 clean:
 	rm -f $(OBJ_DIR)/*.o $(TARGET) 
@@ -83,5 +83,5 @@ libs:
 *.o: *.h
 
 $(OBJ_DIR)/%.o: %.c libs
-	$(CC) $(CFLAGS)$(PROF_FLAG) $(OPT_FLAGS) $(DEBUG_FLAGS) $(INCDIR) -c -o $(OBJ_DIR)/$*.o $<
+	$(CC) $(CFLAGS) $(PROF_FLAG) $(OPT_FLAGS) $(DEBUG_FLAGS) $(INCDIR) -c -o $(OBJ_DIR)/$*.o $<
 

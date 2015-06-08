@@ -492,7 +492,9 @@ int setup_curl_handle (client_context*const cctx, url_context* url)
 * Return Code/Output - On Success - 0, on Error -1
 ******************************************************************************/
 int setup_curl_handle_init (client_context*const cctx, url_context* url)
-{
+{ 
+  //char bind_string[INET6_ADDRSTRLEN + 5 + 1]={0}; /*5 is the length of  "host!"*/	
+
   if (!cctx || !url)
     {
       return -1;
@@ -520,7 +522,12 @@ int setup_curl_handle_init (client_context*const cctx, url_context* url)
   
   if (bctx->ipv6)
     curl_easy_setopt (handle, CURLOPT_IPRESOLVE, CURL_IPRESOLVE_V6);
-      
+    
+  //memset (bind_string, 0,INET6_ADDRSTRLEN + 5 + 1 );
+  //strncpy(bind_string, "host!", 5);
+  //strcat(bind_string, bctx->ip_addr_array [cctx->client_index]);
+  //curl_easy_setopt (handle, CURLOPT_INTERFACE, bind_string);  
+
   /* Bind the handle to a certain IP-address */
   curl_easy_setopt (handle, CURLOPT_INTERFACE, 
                     bctx->ip_addr_array [cctx->client_index]);
