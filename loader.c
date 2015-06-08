@@ -31,6 +31,7 @@
 #include <string.h>
 #include <signal.h>
 #include <stdlib.h>
+#include <unistd.h>
 
 #include <sys/time.h>
 #include <unistd.h>
@@ -109,24 +110,12 @@ static void sigint_handler (int signum)
 
   stop_loading = 1;
 
-  screen_release ();
+  //screen_release ();
 
   close (STDIN_FILENO);
 
   fprintf (stderr, "\n\n======= SIGINT Received ============.\n");
 }
-
-typedef int (*pf_user_activity) (struct client_context*const);
-
-/*
- * Batch functions for the 2 loading modes: 
- * hyper (epoll-based) and smooth (poll-based).
-*/
-static pf_user_activity ua_array[2] = 
-{ 
-  user_activity_hyper,
-  user_activity_smooth
-};
 
 static FILE *create_file (batch_context* bctx, char* fname)
 {
@@ -137,14 +126,20 @@ static FILE *create_file (batch_context* bctx, char* fname)
   return fp;
 }
 
-int 
-main (int argc, char *argv [])
+static void init_some_batch_values(batch_context *master)
+{	
+	memset (master->cl_hostname, 0, 128);
+	gethostname(master->cl_hostname, 127);
+
+	connect_redis_server(master);
+}
+
+int main (int argc, char *argv [])
 {
   batch_context bc_arr[BATCHES_MAX_NUM];
   pthread_t tid[BATCHES_MAX_NUM];
   int batches_num = 0; 
   int i = 0, error = 0;
-
 
   signal (SIGPIPE, SIG_IGN);
 
@@ -204,19 +199,20 @@ main (int argc, char *argv [])
 
   signal (SIGINT, sigint_handler);
 
-  screen_init ();
-  
+  //screen_init ();
+  init_some_batch_values(&bc_arr[0]);
+
   if (! threads_subbatches_num)
     {
-      fprintf (stderr, "\nRUNNING LOAD\n\n");
+      //fprintf (stderr, "\nRUNNING LOAD\n\n");
       sleep (1);
       batch_function (&bc_arr[0]);
-      fprintf (stderr, "Exited batch_function\n");
+      //fprintf (stderr, "Exited batch_function\n");
       screen_release ();
     }
   else
     {
-      fprintf (stderr, "\n%s - RUNNING LOAD, STARTING THREADS\n\n", __func__);
+      //fprintf (stderr, "\n%s - RUNNING LOAD, STARTING THREADS\n\n", __func__);
       sleep (1);
       
       /* Init openssl mutexes and pass two callbacks to openssl. */
@@ -246,7 +242,7 @@ main (int argc, char *argv [])
             {
               bc_arr[i].thread_id = tid[i]; /* Set the thread-id */
 
-              fprintf(stderr, "%s - note: Thread %d, started normally\n", __func__, i);
+              //fprintf(stderr, "%s - note: Thread %d, started normally\n", __func__, i);
             }
         }
 
@@ -287,44 +283,46 @@ static void* batch_function (void * batch_data)
       return NULL;
     }
 
-  if (! stderr_print_client_msg)
-    {
-      /*
-        Init batch logfile for the batch client output 
-      */
-      (void)sprintf (bctx-> batch_logfile, "./%s.log", bctx->batch_name);
-      if (!(log_file = create_file(bctx,bctx->batch_logfile)))
-          return NULL;
-      else
-        {
-          char tbuf[256];
-          (void)fprintf(log_file,"# %ld %s",get_tick_count(),ascii_time(tbuf));
-	  (void)fprintf(log_file,
-            "# msec_offset cycle_no url_no client_no (ip) indic info\n");
-        }
-    }
+	if (bctx->log_enable)
+	{
+		  if (! stderr_print_client_msg)
+		    {
+		      /*
+		        Init batch logfile for the batch client output 
+		      */
+		      (void)sprintf (bctx-> batch_logfile, "./%s.log", bctx->batch_name);
+		      if (!(log_file = create_file(bctx,bctx->batch_logfile)))
+		          return NULL;
+		      else
+		        {
+		          char tbuf[256];
+		          (void)fprintf(log_file,"# %ld %s",get_tick_count(),ascii_time(tbuf));
+			  (void)fprintf(log_file,
+		            "# msec_offset cycle_no url_no client_no (ip) indic info\n");
+		        }
+		    }
 
-  /*
-    Init batch statistics file
-  */
-  (void)sprintf (bctx->batch_statistics, "./%s.txt", bctx->batch_name);
-  if (!(bctx->statistics_file = statistics_file = create_file(bctx,
-    bctx->batch_statistics)))
-      return NULL;
-  else
-      print_statistics_header (statistics_file);
-  
-  /*
-    Init batch operational statistics file
-  */
-  if (bctx->dump_opstats) 
-    {
-      (void)sprintf (bctx->batch_opstats, "./%s.ops", bctx->batch_name);
-      if (!(bctx->opstats_file = opstats_file = create_file(bctx,
-       bctx->batch_opstats)))
-          return NULL;
-    }
-  
+		  /*
+		    Init batch statistics file
+		  */
+		  (void)sprintf (bctx->batch_statistics, "./%s.txt", bctx->batch_name);
+		  if (!(bctx->statistics_file = statistics_file = create_file(bctx,
+		    bctx->batch_statistics)))
+		      return NULL;
+		  else
+		      print_statistics_header (statistics_file);
+		  
+		  /*
+		    Init batch operational statistics file
+		  */
+		  //if (bctx->dump_opstats) 
+		    {
+		      (void)sprintf (bctx->batch_opstats, "./%s.ops", bctx->batch_name);
+		      if (!(bctx->opstats_file = opstats_file = create_file(bctx,
+		       bctx->batch_opstats)))
+		          return NULL;
+		    }
+	}
   /* 
      Init the objects, containing client-context information.
   */
@@ -353,7 +351,7 @@ static void* batch_function (void * batch_data)
      It calls user activity loading function corresponding to the used loading mode
      (user_activity_smooth () or user_activity_hyper ()).
   */ 
-  rval = ua_array[loading_mode] (bctx->cctx_array);
+  rval = user_activity_hyper (bctx->cctx_array);
 
   if (rval == -1)
     {
@@ -393,6 +391,8 @@ static int initial_handles_init (client_context*const ctx_array)
 {
   batch_context* bctx = ctx_array->bctx;
   int k = 0;
+
+  //curl_memdebug("dump");
 
   /* Init CURL multi-handle. */
   if (! (bctx->multiple_handle = curl_multi_init()) )
@@ -475,8 +475,6 @@ int setup_curl_handle (client_context*const cctx, url_context* url)
 ******************************************************************************/
 int setup_curl_handle_init (client_context*const cctx, url_context* url)
 {
-  int is_reconnect=0;
-
   if (!cctx || !url)
     {
       return -1;
@@ -488,12 +486,8 @@ int setup_curl_handle_init (client_context*const cctx, url_context* url)
   curl_easy_reset (handle);
   
   /*simon*/
-  setup_proxy_credentials_for_client(cctx);
+  cc_set_credentials_for_client(cctx);
   
-  /*Caculate the probability value to dicide if using reconnect*/
-
-     is_reconnect=cctx->is_reconnect;
-
   /*
    Choose the next URL from an url set, or complete the url template from 
    prior responses, or prepare to scan for new response values.
@@ -505,11 +499,7 @@ int setup_curl_handle_init (client_context*const cctx, url_context* url)
       fprintf (stderr,"%s - error: update_url_from_set_or_template failed\n", __func__);
 	  return -1;
   }
-
-
-//printf("url->fresh=%d\n", url->fresh_connect);
   
-
   if (bctx->ipv6)
     curl_easy_setopt (handle, CURLOPT_IPRESOLVE, CURL_IPRESOLVE_V6);
       
@@ -606,19 +596,16 @@ int setup_curl_handle_init (client_context*const cctx, url_context* url)
   curl_easy_setopt (handle, CURLOPT_DNS_CACHE_TIMEOUT, -1);
 
   /* Set the connection timeout */
-  curl_easy_setopt (handle, 
-                    CURLOPT_CONNECTTIMEOUT, 
-                    url->connect_timeout ? url->connect_timeout : connect_timeout);
+  curl_easy_setopt (handle, CURLOPT_CONNECTTIMEOUT, url->connect_timeout ? url->connect_timeout : connect_timeout);
 
-  /* Define the connection re-use policy. When passed 1, re-establish */
-  //curl_easy_setopt (handle, CURLOPT_FRESH_CONNECT, url->fresh_connect);
-  curl_easy_setopt (handle, CURLOPT_FRESH_CONNECT, is_reconnect);
-
-  //if (url->fresh_connect)
-  if (is_reconnect)
-    {
-      curl_easy_setopt (handle, CURLOPT_FORBID_REUSE, 1);
-    }
+  if (cctx->is_reconnect)
+  {
+  	curl_easy_setopt (handle, CURLOPT_FRESH_CONNECT, cctx->is_reconnect);
+	if (bctx->proxy_auth_method == CURLAUTH_NONE)
+	{
+		curl_easy_setopt (handle, CURLOPT_FORBID_REUSE, cctx->is_reconnect);
+	}
+  }
 
   /* 
      If DNS resolving is necesary, global DNS cache is enough,
@@ -628,10 +615,11 @@ int setup_curl_handle_init (client_context*const cctx, url_context* url)
 
      curl_easy_setopt (handle, CURLOPT_DNS_USE_GLOBAL_CACHE, 1); 
   */
-  
+
+
   curl_easy_setopt (handle, CURLOPT_VERBOSE, 1);
-  curl_easy_setopt (handle, CURLOPT_DEBUGFUNCTION, 
-                    client_tracing_function);
+  curl_easy_setopt (handle, CURLOPT_DEBUGFUNCTION, client_tracing_function);
+
 
   /* 
      This is to return cctx pointer as the void* userp to the 
@@ -742,7 +730,7 @@ int setup_curl_handle_init (client_context*const cctx, url_context* url)
                __func__);
       return -1;
     }
-
+#if 0
   /*simon*/
 	{  
 		char* buf_out;
@@ -752,15 +740,15 @@ int setup_curl_handle_init (client_context*const cctx, url_context* url)
 		{
 			memset(buf_out, 0, 512);
 			
-			snprintf(buf_out, 512, "Tid:%ld--(%d)%s--(%d)%s--(%d)%s\n", 
+			snprintf(buf_out, 512, "Tid:%ld--(%d)%s--(%d)%s\n", 
 				     gettid(),
-				     cctx->client_index, bctx->ip_addr_array [cctx->client_index],  
-				     cctx->client_credentials_index, cctx->client_credentials,
+				     (int)cctx->client_index, bctx->client_principle_name_array [cctx->client_index],  				 
 				     url->set.index, url->url_str);
 			write_log_for_multi_creds(buf_out);
 			free (buf_out);
 		}
 	} 
+#endif
   return 0;
 }
   
@@ -888,6 +876,7 @@ int setup_curl_handle_appl (client_context*const cctx, url_context* url)
 			curl_easy_setopt(handle, CURLOPT_CUSTOMREQUEST, "DELETE");
 		}
 
+#if 0
       if (url->web_auth_method)
         {
           if (!url->web_auth_credentials)
@@ -907,7 +896,6 @@ int setup_curl_handle_appl (client_context*const cctx, url_context* url)
             }
           curl_easy_setopt(handle, CURLOPT_HTTPAUTH, url->web_auth_method);
         }
-#if 0
       if (url->proxy_auth_method)
         {
           if (!url->proxy_auth_credentials)
@@ -1204,16 +1192,19 @@ static int init_client_formed_buffer (client_context* cctx,
 #define write_log(ind, data) \
   if (1) {\
     char *end = data+strlen(data)-1;\
-    if (*end == '\n')\
-      *end = '\0';\
-    (void)fprintf(cctx->file_output,"%ld %ld %ld %s%s %s",\
-     offs_resp, cctx->cycle_num, (long)cctx->url_curr_index, cctx->client_name,\
-     ind, data);\
-    if (url_print)\
-      (void)fprintf(cctx->file_output," eff-url: url %s",url);\
-    if (url_diff)\
-      (void)fprintf(cctx->file_output," url: url %s",url_target);\
-    (void)fprintf(cctx->file_output,"\n");\
+    if (cctx->bctx->log_enable) \
+    { \
+	    if (*end == '\n')\
+	      *end = '\0';\
+	    (void)fprintf(cctx->file_output,"%ld %ld %ld %s%s %s",\
+	     offs_resp, cctx->cycle_num, (long)cctx->url_curr_index, cctx->client_name,\
+	     ind, data);\
+	    if (url_print)\
+	      (void)fprintf(cctx->file_output," eff-url: url %s",url);\
+	    if (url_diff)\
+	      (void)fprintf(cctx->file_output," url: url %s",url_target);\
+	    (void)fprintf(cctx->file_output,"\n");\
+    }  \
   }
 
 #define write_log_num(ind, num) \
@@ -1473,7 +1464,7 @@ static int client_tracing_function (CURL *handle,
       break;
 
     case CURLINFO_DATA_IN:     
-      if (verbose_logging > 1) 
+      if (verbose_logging > 1 && cctx->bctx->log_enable) 
           (void)fprintf(cctx->file_output,
                  "%ld %ld %ld %s<= Recv data: eff-url: %s, url: %s\n", 
                   offs_resp, cctx->cycle_num, (long)cctx->url_curr_index,
@@ -1500,7 +1491,7 @@ static int client_tracing_function (CURL *handle,
    GF
    Show the data after the header label
    */
-  if (detailed_logging)
+  if (detailed_logging && cctx->bctx->log_enable)
   {
       char detailed_buff[CURL_ERROR_SIZE +1]; size_t nbytes;
       
@@ -1573,8 +1564,6 @@ static int init_client_contexts (batch_context* bctx,
          configuration and set back statistics to batch.
       */
       cctx->bctx = bctx;
-	  /*simon*/
-	  bind_credentials_with_client(cctx);
     }
 
   return 0;
@@ -1598,6 +1587,8 @@ static void free_batch_data_allocations (batch_context* bctx)
 
   op_stat_point_release (&bctx->op_delta);
   op_stat_point_release (&bctx->op_total);
+
+  disconnect_redis_server (bctx);
   
   /*
      Free client contexts 
@@ -1638,12 +1629,7 @@ static void free_batch_data_allocations (batch_context* bctx)
               free (cctx->url_fetch_decision);
               cctx->url_fetch_decision = NULL;
           }
-			/*simon*/
-		    if (cctx->client_credentials)
-		    {
-		    	free (cctx->client_credentials);
-				cctx->client_credentials=NULL;	
-             }
+
          }/* from for */
       
       free(bctx->cctx_array);
@@ -1669,8 +1655,8 @@ static void free_batch_data_allocations (batch_context* bctx)
       bctx->url_ctx_array = NULL;
   }
 /*simon*/
-free_client_credentials();  
 free_post_filenames();
+cc_free_client_credentials(bctx);
 }
 
 static void free_url (url_context* url, int clients_max)
@@ -1740,7 +1726,8 @@ static void free_url (url_context* url, int clients_max)
       fclose (url->upload_file_ptr);
       url->upload_file_ptr = 0;
     }
-  
+
+  #if 0
   /* Free web-authentication credentials */
   if (url->web_auth_credentials)
     {
@@ -1748,7 +1735,6 @@ static void free_url (url_context* url, int clients_max)
       url->web_auth_credentials = 0;
     }
   
-  #if 0
   /* Free proxy-authentication credentials */
   if (url->proxy_auth_credentials)
     {
@@ -1959,6 +1945,7 @@ static int ip_addr_str_allocate_init (batch_context* bctx,
   return 0;
 }
 
+#if 0
 /****************************************************************************************
 * Function name - rewind_logfile_above_maxsize
 *
@@ -1992,6 +1979,7 @@ int rewind_logfile_above_maxsize (FILE* filepointer)
 
   return 0;
 }
+#endif
 
 /****************************************************************************************
 * Function name - ipv6_increment
@@ -2065,6 +2053,7 @@ static int create_thr_subbatches (batch_context *bc_arr, int subbatches_num)
   batch_context master;
   memcpy (&master, &bc_arr[0], sizeof (master));
 
+
   if (master.client_num_max < subbatches_num)
   {
       fprintf (stderr, "%s - error: wrong input CLIENT_NUM_MAX is less than "
@@ -2074,6 +2063,16 @@ static int create_thr_subbatches (batch_context *bc_arr, int subbatches_num)
 
   int c_num_max = 0;
 
+	/*Simon*/
+	if (master.proxy_credentials_type == 1)
+	{
+		if (master.client_creds_num < subbatches_num)
+		{
+	      fprintf (stderr, "%s - error: the credentials number is less than "
+	               "the subbatches number (%d).\n", __func__, subbatches_num);
+	      return -1;		
+		}
+	}
 
   int i;
   for (i = 0 ; i < subbatches_num ; i++) 
@@ -2081,8 +2080,8 @@ static int create_thr_subbatches (batch_context *bc_arr, int subbatches_num)
       sprintf (bc_arr[i].batch_name, "%s_%d", master.batch_name, i);
       sprintf (bc_arr[i].batch_logfile, "%s.log", bc_arr[i].batch_name);
       sprintf (bc_arr[i].batch_statistics, "%s.txt", bc_arr[i].batch_name);
-      
-      if (i != subbatches_num)
+	  
+      if (i != subbatches_num-1)
       {
           bc_arr[i].client_num_max = master.client_num_max / subbatches_num;
           c_num_max += bc_arr[i].client_num_max; 
@@ -2107,7 +2106,16 @@ static int create_thr_subbatches (batch_context *bc_arr, int subbatches_num)
           if (! bc_arr[i].clients_rampup_inc)
               bc_arr[i].clients_rampup_inc = 1;
       }
-      
+
+	  if (master.log_enable)
+	  {
+	  	bc_arr[i].log_enable = master.log_enable;
+	  }
+
+	  strncpy(bc_arr[i].cl_hostname, master.cl_hostname, 128);
+	  bc_arr[i].redis_handle = master.redis_handle;
+	  
+	  
       strcpy(bc_arr[i].net_interface, master.net_interface);
       
       bc_arr[i].ipv6 = master.ipv6;
@@ -2202,6 +2210,54 @@ static int create_thr_subbatches (batch_context *bc_arr, int subbatches_num)
           }
       }
 
+
+      /* 
+         Copy the client credentials
+         TODO: memory leak of client credentials with the batch bc_arr[0] 
+      */
+
+	  /*Simon*/
+	  bc_arr[i].proxy_credentials_type=master.proxy_credentials_type;
+	  bc_arr[i].proxy_auth_method=master.proxy_auth_method;
+	  bc_arr[i].client_creds_num= master.client_creds_num / subbatches_num;
+	  
+	  if (master.client_creds_array && master.client_principle_name_array)
+	  {
+		  if (master.proxy_credentials_type == 0)
+		  {
+		  	bc_arr[i].client_creds_num=1;
+			bc_arr[i].client_creds_array=(char**)malloc((bc_arr[i].client_creds_num)*sizeof(char *));
+			bc_arr[i].client_principle_name_array=(char**)malloc((bc_arr[i].client_creds_num)*sizeof(char *));
+			bc_arr[i].client_creds_array[0]=(char*)malloc(strlen (master.client_creds_array[0])+1);
+			bc_arr[i].client_principle_name_array[0]=(char*)malloc(strlen (master.client_principle_name_array[0])+1);
+		  	memcpy (bc_arr[i].client_creds_array[0], master.client_creds_array[0], (strlen (master.client_creds_array[0])+1));
+			memcpy (bc_arr[i].client_principle_name_array[0], master.client_principle_name_array[0], (strlen (master.client_principle_name_array[0])+1));
+		  }
+		  else
+		  {
+
+			if (i)
+			{
+				int j=0;
+				bc_arr[i].client_creds_array=(char**)malloc((bc_arr[i].client_creds_num)*sizeof(char *));
+				bc_arr[i].client_principle_name_array=(char**)malloc((bc_arr[i].client_creds_num)*sizeof(char *));
+				for (j = 0; j < bc_arr[i].client_creds_num; j++)
+				{
+					int index =(bc_arr[i-1].client_creds_num)*i+j;
+					int cred_len = strlen (master.client_creds_array[index])+1;
+					
+					//printf ("i=%d, j=%d, index=%d  len=%d\n", i, j, index, cred_len);
+					
+					bc_arr[i].client_creds_array[j]=(char*)malloc(cred_len);
+					bc_arr[i].client_principle_name_array[j]=(char*)malloc(cred_len);			
+					memcpy (bc_arr[i].client_creds_array[j], master.client_creds_array[index], (strlen (master.client_creds_array[index])+1));
+					memcpy (bc_arr[i].client_principle_name_array[j], master.client_principle_name_array[index], (strlen (master.client_principle_name_array[index])+1));
+					//printf("cred=%s   pn=%s\n", bc_arr[i].client_creds_array[j], bc_arr[i].client_principle_name_array[j]);
+				}
+			}
+		  }
+	  }
+
       bc_arr[i].url_index = master.url_index;
 
       bc_arr[i].first_cycling_url = master.first_cycling_url;
@@ -2249,7 +2305,7 @@ static int create_thr_subbatches (batch_context *bc_arr, int subbatches_num)
       if (i)
       {
           bc_arr[i].cctx_array = 0;
-          bc_arr[i].free_clients = 0;
+          //bc_arr[i].free_clients = 0;
           
           /*
             Allocate array of client contexts
@@ -2262,6 +2318,8 @@ static int create_thr_subbatches (batch_context *bc_arr, int subbatches_num)
                        bc_arr[i].batch_name, __func__);
               return -1;
           }
+
+	#if 0	  
           if (master.req_rate)
           {
               /*
@@ -2287,6 +2345,7 @@ static int create_thr_subbatches (batch_context *bc_arr, int subbatches_num)
                       bc_arr[i].free_clients[ix] = client_num++;
               }
           }
+	#endif	  
       }
       
       /* Zero the pointers to be initialized. */

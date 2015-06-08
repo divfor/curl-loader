@@ -17,8 +17,8 @@ diff -Naru libevent-1.4.14b-stable/epoll.c libevent-1.4.14b-stable-mod/epoll.c
  
  #define INITIAL_NFILES 32
  #define INITIAL_NEVENTS 32
--#define MAX_NEVENTS 4096
-+#define MAX_NEVENTS (128*1024)
+-#define MAX_NEVENT 4096
++#define MAX_NEVENT (128*1024)
  
  static void *
  epoll_init(struct event_base *base)

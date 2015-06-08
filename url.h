@@ -261,6 +261,7 @@ typedef struct url_context
   struct curl_httppost* mpart_form_post;
   struct curl_httppost* mpart_form_last;
 
+#if 0
   /* Web authentication method. If 0 - no Web authentication */
   authentication_method  web_auth_method;
   
@@ -270,7 +271,6 @@ typedef struct url_context
   */
   char* web_auth_credentials;
 
-#if 0
   /* Proxy authentication method. If 0 - no proxy authentication */
   authentication_method  proxy_auth_method;
   

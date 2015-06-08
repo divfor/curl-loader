@@ -44,6 +44,9 @@
 static int mget_url_hyper (batch_context* bctx);
 static int mperform_hyper (batch_context* bctx, int* still_running);
 
+//static struct timeval timeout_next_load={0, TIMER_NEXT_LOAD};
+
+
 
 #if 0
 #define PRINTF(args...) fprintf(stdout, ## args);
@@ -285,12 +288,14 @@ static int socket_callback (CURL *handle,
   batch_context* bctx = (batch_context *) cbp;
   client_context* cctx = (client_context *) sockp;
   sock_info *sinfo = (sock_info*) cctx ? cctx->ext_data : 0;
+  char *curlinfo = NULL;
 
   PRINTF("socket_callback - enter\n");
 
   if (!cctx)
-    {
-      curl_easy_getinfo (handle, CURLINFO_PRIVATE, &cctx);
+    {  		  
+      curl_easy_getinfo (handle, CURLINFO_PRIVATE, &curlinfo);
+	  cctx = (client_context *)curlinfo;
 
       if (cctx) 
         {
@@ -366,9 +371,19 @@ static void update_timeout_hyper (batch_context *bctx)
   timeout.tv_usec = (timeout_ms%1000)*1000;
   evtimer_add (bctx->timer_event, &timeout);
 #endif
+
+   //evtimer_add (bctx->timer_event, &timeout_next_load);
 }
 
-
+#if 0
+void initialize_timeout(struct event_base *base)
+{
+    struct timeval tv_in = { 0, TIMER_NEXT_LOAD };
+    const struct timeval *tv_out;
+    tv_out = event_base_init_common_timeout(base, &tv_in);
+    memcpy(&timeout_next_load, tv_out, sizeof(struct timeval));
+}
+#endif
 /************************************************************************
  * Function name - next_load_cb_hyper
  *
@@ -402,6 +417,7 @@ static void next_load_cb_hyper (int fd, short kind, void *userp)
   tv.tv_usec = TIMER_NEXT_LOAD;
   
   event_add (bctx->timer_next_load_event, &tv);  
+  //event_add (bctx->timer_next_load_event, &timeout_next_load);  
 }
 
 /****************************************************************************************
@@ -426,6 +442,7 @@ int user_activity_hyper (client_context* cctx_array)
 
   /* Init libevent library */
   bctx->eb = event_init ();
+  //initialize_timeout(bctx->eb);
 
   if (! (bctx->timer_event = cl_calloc (sizeof (struct event), 1)))
   {
@@ -493,12 +510,17 @@ int user_activity_hyper (client_context* cctx_array)
   struct timeval tv;
   timerclear(&tv);
   tv.tv_usec = TIMER_NEXT_LOAD;	
-  event_add (bctx->timer_next_load_event, &tv);
 
+  
+  event_add (bctx->timer_next_load_event, &tv);
+  //event_add (bctx->timer_next_load_event, &timeout_next_load);
+
+#if 0
   if (is_batch_group_leader (bctx))
     {
-      dump_snapshot_interval (bctx, now_time);
+      generate_cycle_reporting (bctx, now_time);
     }
+#endif
 
   /* 
      ========= Run the loading machinery ================
@@ -521,8 +543,8 @@ static int on_exit_hyper (batch_context* bctx)
 
     still_running =0;
 
-  dump_final_statistics (bctx->cctx_array);
-  screen_release ();
+  //dump_final_statistics (bctx->cctx_array);
+  //screen_release ();
 
   /* 
      ======= Release resources =========================
@@ -608,7 +630,8 @@ static int mperform_hyper (batch_context* bctx, int* still_running)
     {
       if (is_batch_group_leader (bctx))
         {
-          dump_snapshot_interval (bctx, now_time);
+          //dump_snapshot_interval (bctx, now_time);
+          generate_cycle_reporting(bctx, now_time);
         }
     }
 
@@ -620,8 +643,10 @@ static int mperform_hyper (batch_context* bctx, int* still_running)
 
           CURL *handle = msg->easy_handle;
           client_context *cctx = NULL;
+		  char *curlinfo = NULL;
 
-          curl_easy_getinfo (handle, CURLINFO_PRIVATE, &cctx);
+          curl_easy_getinfo (handle, CURLINFO_PRIVATE, &curlinfo);
+		  cctx = (client_context *)curlinfo;
 
           if (!cctx)
             {
@@ -647,6 +672,7 @@ static int mperform_hyper (batch_context* bctx, int* still_running)
 	          Load next step only if request rate is not specified.
 		        Otherwise requests are made on a timer.
           */
+#if 0
 	        if (bctx->req_rate) 
             {
               if (put_free_client(cctx) < 0)
@@ -658,16 +684,17 @@ static int mperform_hyper (batch_context* bctx, int* still_running)
             }
           else
             {
-              /*cstate client_state =  */
-              load_next_step (cctx, now_time, &scheduled_now);
+#endif
+		/*cstate client_state =  */
+		load_next_step (cctx, now_time, &scheduled_now);
 
-             if (scheduled_now)
-               {
-                 scheduled_now_count++;
-               }
+		if (scheduled_now)
+		{
+			scheduled_now_count++;
+		}
 
              //fprintf (stderr, "%s - after load_next_step client state %d.\n", __func__, client_state);
-            }
+           // }
 
           if (msg_num <= 0)
             {

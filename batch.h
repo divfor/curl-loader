@@ -30,6 +30,7 @@
 #include <pthread.h>
 
 #include <curl/curl.h>
+#include <hiredis.h>
 
 #include "timer_queue.h"
 #include "timer_node.h"
@@ -154,6 +155,10 @@ typedef struct batch_context
   */
   int req_rate;
 
+
+int log_enable;
+
+
    /* 
       User-agent string to appear in the HTTP 1/1 requests.
   */
@@ -206,8 +211,16 @@ typedef struct batch_context
    /* Assisting array of pointers to ip-addresses */
   char** ip_addr_array;
 
+	/*Simon--for client credential*/
+	int proxy_credentials_type;
+	int client_creds_num;
+	char** client_creds_array;
+	char** client_principle_name_array;
+	authentication_method  proxy_auth_method;
+	//int is_transparent_proxy;
+	
   /* Current parsing state. Used on reading and parsing conf-file. */ 
-  size_t batch_init_state; 
+  //size_t batch_init_state; 
 
   /* Common error buffer for all batch clients */
   char error_buffer[CURL_ERROR_SIZE];
@@ -216,16 +229,16 @@ typedef struct batch_context
   struct client_context* cctx_array;
 
   /* Number of clients free to send fixed rate requests */
-  int free_clients_count;
+  //int free_clients_count;
 
   /* List of clients free to send fixed rate requests */
-  int* free_clients;
+  //int* free_clients;
 
   /* Indicates that request scheduling is over */
   int requests_completed;
 
   /* Request rate timer invocation sequence number within a second */
-  int req_rate_timer_invocation;
+  //int req_rate_timer_invocation;
 
   /* Counter used mainly by smooth mode: active clients */
   int active_clients_count;
@@ -281,7 +294,7 @@ typedef struct batch_context
   FILE* opstats_file;
 
   /* Dump operational statistics indicator, 0: no dump */
-  int dump_opstats;
+  //int dump_opstats;
 
   /* Timestamp, when the loading started */
   unsigned long start_time; 
@@ -303,10 +316,12 @@ typedef struct batch_context
   op_stat_point op_delta;
   op_stat_point op_total;
 
-  /* Count of response times dumped before new-line,
-   used to limit line length */
-  int ct_resps;
-
+  reporting_way reporting_way;
+  char redis_server[128];
+  int redis_port;
+  char cl_hostname[128];
+  redisContext* redis_handle;
+  redis_statistics_output rs_output;
 } batch_context;
 
 

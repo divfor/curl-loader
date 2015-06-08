@@ -58,7 +58,7 @@ void first_hdr_2xx_inc (client_context* cctx)
 }
 int first_hdr_3xx (client_context* cctx)
 {
-  return cctx->first_hdr_3xx++;
+  return cctx->first_hdr_3xx;
 }
 void first_hdr_3xx_inc (client_context* cctx)
 {

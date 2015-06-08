@@ -63,7 +63,8 @@ void screen_init ()
 void screen_release ()
 {
   /* re-enable echoing */
-  tcsetattr(STDIN_FILENO, TCSANOW, &start_tty);
+  //tcsetattr(STDIN_FILENO, TCSANOW, &start_tty);
+  return;
 }
 
 /*

@@ -114,8 +114,10 @@ static int cycles_num_parser (batch_context*const bctx, char*const value);
 static int run_time_parser (batch_context*const bctx, char*const value);
 static int user_agent_parser (batch_context*const bctx, char*const value);
 static int urls_num_parser (batch_context*const bctx, char*const value);
-static int dump_opstats_parser (batch_context*const bctx, char*const value);
-static int req_rate_parser (batch_context*const bctx, char*const value);
+//static int dump_opstats_parser (batch_context*const bctx, char*const value);
+//static int req_rate_parser (batch_context*const bctx, char*const value);
+static int log_enable_parser (batch_context*const bctx, char*const value);
+
 
 /*
  * URL section tag parsers. 
@@ -137,9 +139,8 @@ static int upload_file_parser (batch_context*const bctx, char*const value);
 
 static int multipart_form_data_parser (batch_context*const bctx, char*const value);
 
-static int web_auth_method_parser (batch_context*const bctx, char*const value);
-static int web_auth_credentials_parser (batch_context*const bctx, char*const value);
-/*simon*/
+//static int web_auth_method_parser (batch_context*const bctx, char*const value);
+//static int web_auth_credentials_parser (batch_context*const bctx, char*const value);
 static int proxy_auth_method_parser (batch_context*const bctx, char*const value);
 static int post_record_file_parser(batch_context*const bctx, char*const value);
 
@@ -162,7 +163,6 @@ static int fetch_probability_once_parser (batch_context*const bctx, char*const v
 static int form_records_random_parser (batch_context*const bctx, char*const value);
 static int form_records_file_max_num_parser(batch_context*const bctx, char*const value);
 
-/* GF url-set parsers.  */
 static int url_template_parser(batch_context* const bctx, char* const value);
 static int url_token_parser(batch_context* const bctx, char* const value);
 static int url_token_file_parser(batch_context* const bctx, char* const value);
@@ -174,6 +174,10 @@ static int ignore_content_length (batch_context*const bctx, char*const value);
 static int url_random_range (batch_context*const bctx, char*const value);
 static int url_random_token (batch_context*const bctx, char*const value);
 static int url_cycling_parser(batch_context * const batch, char * const value);
+
+static int reporting_way_parser (batch_context*const bctx, char*const value);
+static int redis_server_parser (batch_context*const bctx, char*const value);
+static int redis_port_parser (batch_context*const bctx, char*const value);
 
 /*
  * The mapping between tag strings and parsing functions.
@@ -192,72 +196,73 @@ static const tag_parser_pair tp_map [] =
     {"IP_SHARED_NUM", ip_shared_num_parser},
     {"CYCLES_NUM", cycles_num_parser},
     {"RUN_TIME", run_time_parser},
+    //{"REQ_RATE", req_rate_parser},
+
+	/*------------------------ URL SECTION -------------------------------- */
+	{"URLS_NUM", urls_num_parser},
+	{"URL", url_parser},
+	{"URL_SHORT_NAME", url_short_name_parser},
+	{"URL_USE_CURRENT", url_use_current_parser},
+	{"URL_DONT_CYCLE", url_dont_cycle_parser},
+	{"FETCH_PROBABILITY", fetch_probability_parser},
+    {"FETCH_PROBABILITY_ONCE", fetch_probability_once_parser},
+		
+	{"URL_CYCLING", url_cycling_parser},
+	{"URL_TEMPLATE", url_template_parser},
+    {"URL_TOKEN", url_token_parser},
+    {"URL_TOKEN_FILE", url_token_file_parser},
+    {"RESPONSE_TOKEN", response_token_parser},
+	{"REQUEST_TYPE", request_type_parser},
+
+	{"TIMER_URL_COMPLETION", timer_url_completion_parser},
+    {"TIMER_AFTER_URL_SLEEP", timer_after_url_sleep_parser},
+
+	/*------------------------ RANDOM URL-------------------------------- */
+	{"RANDOM_SEED", random_seed_parser},
+	{"URL_RANDOM_RANGE", url_random_range},
+    {"URL_RANDOM_TOKEN", url_random_token},
+
+	/*------------------------LIBCURL OPTION-------------------------------- */
     {"USER_AGENT", user_agent_parser},
-    {"URLS_NUM", urls_num_parser},
-    {"DUMP_OPSTATS", dump_opstats_parser},
-    {"REQ_RATE", req_rate_parser},
-    
+	{"HEADER", header_parser},
+	{"TRANSFER_LIMIT_RATE", transfer_limit_rate_parser},
+	{"TIMER_TCP_CONN_SETUP", timer_tcp_conn_setup_parser},
+	{"FRESH_CONNECT", fresh_connect_parser},
+	{"IGNORE_CONTENT_LENGTH", ignore_content_length},
+	{"FTP_ACTIVE", ftp_active_parser},
 
-    /*------------------------ URL SECTION -------------------------------- */
+	/*------------------------PROXY/AUTHENTICATION OPTION-------------------------------- */
+	//{"WEB_AUTH_METHOD", web_auth_method_parser},
+    //{"WEB_AUTH_CREDENTIALS", web_auth_credentials_parser},
+	//{"PROXY_NAME", proxy_name_parser},
+    //{"PROXY_PORT", proxy_port_parser},
+    {"CREDENTIALS_TYPE", credentials_type_parser},
+    {"CREDENTIALS_RECORD_FILE", credentials_record_file_parser},
+	{"PROXY_AUTH_CREDENTIALS", proxy_auth_credentials_parser},
+	{"PROXY_AUTH_METHOD", proxy_auth_method_parser},
 
-    {"URL", url_parser},
-    {"URL_SHORT_NAME", url_short_name_parser},
-    {"URL_USE_CURRENT", url_use_current_parser},
-    {"URL_DONT_CYCLE", url_dont_cycle_parser},
-    {"HEADER", header_parser},
-    {"REQUEST_TYPE", request_type_parser},
-
+	/*------------------------FORM / UPLOAD-------------------------------- */
     {"USERNAME", username_parser},
     {"PASSWORD", password_parser},
     {"FORM_USAGE_TYPE", form_usage_type_parser},
     {"FORM_STRING", form_string_parser},
     {"FORM_RECORDS_FILE", form_records_file_parser},
-
+	{"FORM_RECORDS_RANDOM", form_records_random_parser},
+    {"FORM_RECORDS_FILE_MAX_NUM", form_records_file_max_num_parser},
+    {"FORM_RECORDS_CYCLE", form_records_cycle_parser},
     {"UPLOAD_FILE", upload_file_parser},
-
     {"POST_RECORD_FILE", post_record_file_parser},
     {"MULTIPART_FORM_DATA", multipart_form_data_parser},
 
-    {"WEB_AUTH_METHOD", web_auth_method_parser},
-    {"WEB_AUTH_CREDENTIALS", web_auth_credentials_parser},
-    {"PROXY_AUTH_METHOD", proxy_auth_method_parser},
-    {"PROXY_AUTH_CREDENTIALS", proxy_auth_credentials_parser},
-
-	/*simon*/
-    {"CREDENTIALS_TYPE", credentials_type_parser},
-    {"CREDENTIALS_RECORD_FILE", credentials_record_file_parser},
-    {"ACCESS_DEBUG_ENABLE", access_debug_flag_parser},
-    {"FRESH_CONNECT", fresh_connect_parser},
-
-    {"TIMER_TCP_CONN_SETUP", timer_tcp_conn_setup_parser},
-    {"TIMER_URL_COMPLETION", timer_url_completion_parser},
-    {"TIMER_AFTER_URL_SLEEP", timer_after_url_sleep_parser},
-
-    {"FTP_ACTIVE", ftp_active_parser},
+	/*------------------------LOG / STATISTICS-------------------------------- */
+    //{"DUMP_OPSTATS", dump_opstats_parser},
+    {"LOG_ENABLE", log_enable_parser},
     {"LOG_RESP_HEADERS", log_resp_headers_parser},
     {"LOG_RESP_BODIES", log_resp_bodies_parser},
     {"RESPONSE_STATUS_ERRORS", response_status_errors_parser},
-
-    {"TRANSFER_LIMIT_RATE", transfer_limit_rate_parser},
-
-    {"FETCH_PROBABILITY", fetch_probability_parser},
-    {"FETCH_PROBABILITY_ONCE", fetch_probability_once_parser},
-
-    {"FORM_RECORDS_RANDOM", form_records_random_parser},
-    {"FORM_RECORDS_FILE_MAX_NUM", form_records_file_max_num_parser},
-    
-    /* GF */
-    {"URL_TEMPLATE", url_template_parser},
-    {"URL_TOKEN", url_token_parser},
-    {"URL_TOKEN_FILE", url_token_file_parser},
-    {"RESPONSE_TOKEN", response_token_parser},
-    {"FORM_RECORDS_CYCLE", form_records_cycle_parser},
-    {"RANDOM_SEED", random_seed_parser},
-    {"URL_CYCLING", url_cycling_parser},
-
-    {"IGNORE_CONTENT_LENGTH", ignore_content_length},
-    {"URL_RANDOM_RANGE", url_random_range},
-    {"URL_RANDOM_TOKEN", url_random_token},
+    {"REPORTING_WAY", reporting_way_parser},
+    {"REDIS_SERVER", redis_server_parser},
+    {"REDIS_PORT", redis_port_parser},
 
     {NULL, 0}
 };
@@ -989,6 +994,7 @@ static int urls_num_parser (batch_context*const bctx, char*const value)
     return 0;
 }
 
+#if 0
 static int dump_opstats_parser (batch_context*const bctx, char*const value)
 {
     if (value[0] == 'Y' || value[0] == 'y' ||
@@ -1013,6 +1019,74 @@ static int req_rate_parser (batch_context*const bctx, char*const value)
     }
     return 0;
 }
+#endif
+
+static int log_enable_parser (batch_context*const bctx, char*const value)
+{
+    bctx->log_enable = atol (value);
+    if (bctx->log_enable < 0)
+    {
+        bctx->log_enable = 0;
+    }
+    return 0;	
+}
+
+#define REPORTING_WAY_LEN_MAX 32
+static int reporting_way_parser (batch_context*const bctx, char*const value)
+{
+    if (strncmp (value, "CONSOLE", REPORTING_WAY_LEN_MAX) == 0)
+    {
+        bctx->reporting_way = CONSOLE_REPORTING;
+    }
+	else if (strncmp (value, "REDIS", REPORTING_WAY_LEN_MAX) == 0)
+	{
+		bctx->reporting_way = REDIS_REPORTING;
+	}
+	else if (strncmp (value, "CONSOLE_AND_REDIS", REPORTING_WAY_LEN_MAX) == 0)
+	{
+		bctx->reporting_way = CONSOLE_AND_REDIS;
+	}
+	else
+	{
+		fprintf (stderr, "%s - error : REPORTING_WAY should be CONSOLE, REDIS or CONSOLE_AND_REDIS.\n", __FUNCTION__);
+		return -1;
+	}
+
+	
+    return 0;
+}
+
+static int redis_server_parser (batch_context*const bctx, char*const value)
+{
+	if (strlen (value) <= 0)
+	{
+		fprintf(stderr, "%s - warning: empty redis_server_parser \n", __func__);
+		return -1;
+	}
+
+	memset (&bctx->redis_server[0], 0, 128);
+	strncpy (&bctx->redis_server[0], value, 128);
+	if (!bctx->redis_port)
+	{
+		bctx->redis_port=6379;   /*REDIS default port*/
+	}
+
+	return 0;
+}
+
+static int redis_port_parser (batch_context*const bctx, char*const value)
+{
+	if (strlen (value) <= 0)
+	{
+		fprintf(stderr, "%s - warning: empty redis_port_parser \n", __func__);
+		return -1;
+	}
+
+	bctx->redis_port = atoi(value);
+
+	return 0;
+}
+
 
 static int url_parser (batch_context*const bctx, char*const value)
 {
@@ -1867,6 +1941,7 @@ static int multipart_form_data_parser (batch_context*const bctx, char*const valu
   return 0;
 }
 
+#if 0
 static int web_auth_method_parser (batch_context*const bctx, char*const value)
 {
   url_context* url = &bctx->url_ctx_array[bctx->url_index];
@@ -1938,6 +2013,8 @@ static int web_auth_credentials_parser (batch_context*const bctx, char*const val
   
   return 0;
 }
+#endif
+
 static int proxy_auth_method_parser (batch_context*const bctx, char*const value)
 {
 #if 0
@@ -1973,20 +2050,20 @@ static int proxy_auth_method_parser (batch_context*const bctx, char*const value)
 if(!bctx)return 1;
 if (!strcmp (value, NON_APPLICABLE_STR))
   {
-	proxy_auth_method= AUTHENTICATION_NO;
+	bctx->proxy_auth_method= AUTHENTICATION_NO;
 	return 0;
   }
 
 if (!strcmp (value, AUTH_BASIC))
-	proxy_auth_method = AUTHENTICATION_BASIC;
+	bctx->proxy_auth_method = AUTHENTICATION_BASIC;
 else if (!strcmp (value, AUTH_DIGEST))
-	proxy_auth_method = AUTHENTICATION_DIGEST;
+	bctx->proxy_auth_method = AUTHENTICATION_DIGEST;
 else if (!strcmp (value, AUTH_GSS_NEGOTIATE))
-  proxy_auth_method = AUTHENTICATION_GSS_NEGOTIATE;
+  bctx->proxy_auth_method = AUTHENTICATION_GSS_NEGOTIATE;
 else if (!strcmp (value, AUTH_NTLM))
-  proxy_auth_method = AUTHENTICATION_NTLM;
+  bctx->proxy_auth_method = AUTHENTICATION_NTLM;
 else if (!strcmp (value, AUTH_ANY))
-  proxy_auth_method = AUTHENTICATION_ANY;
+  bctx->proxy_auth_method = AUTHENTICATION_ANY;
 else
   {
 	fprintf (stderr, 
@@ -2875,6 +2952,8 @@ static int post_validate_init (batch_context*const bctx)
                    bctx->batch_name, __func__);
           return -1;
         }
+
+#if 0  
       if (bctx->req_rate)
         {
           /*
@@ -2900,6 +2979,7 @@ static int post_validate_init (batch_context*const bctx)
                   bctx->free_clients[ix] = client_num++;
             }
         }
+#endif	  
     }
 
   if (create_response_logfiles_dirs (bctx) == -1)
@@ -3025,9 +3105,9 @@ int parse_config_file (char* const filename,
 
      /* for compatibility with older configurations set default value
         of dump_opstats to 1 ("yes") */
-  unsigned i;
-  for (i = 0; i < bctx_array_size; i++)
-     bctx_array[i].dump_opstats = 1;   
+  //unsigned i;
+  //for (i = 0; i < bctx_array_size; i++)
+    // bctx_array[i].dump_opstats = 1;   
 
   int line_no = 0;
   while (fgets (fgets_buff, sizeof (fgets_buff) - 1, fp))

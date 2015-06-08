@@ -54,14 +54,13 @@ long snapshot_statistics_timeout = 3; /* Seconds */
 */
 long logfile_rewind_size = 1024;
 
-/* Whether to stdout the downloaded file body */
-int output_to_stdout = 0;
-
 /* If to output client messages to stderr, otherwise to logfile */
 int stderr_print_client_msg = 0;
 
+#if 0
 /* Storming or smooth loading */
 int loading_mode = LOAD_MODE_DEFAULT;
+#endif
 
  /* Whether to include url to all log outputs. */
 int url_logging = 0;
@@ -89,7 +88,7 @@ int parse_command_line (int argc, char *argv [])
 {
   int rget_opt = 0;
 
-    while ((rget_opt = getopt (argc, argv, "c:dehf:i:l:m:op:rst:vVuwx:")) != EOF) 
+    while ((rget_opt = getopt (argc, argv, "c:dehf:i:l:p:st:vVuwx:")) != EOF) 
     {
       switch (rget_opt) 
         {
@@ -141,26 +140,6 @@ int parse_command_line (int argc, char *argv [])
                   __func__);
               return -1;
             }
-          break;
-
-        case 'm': /* Modes of loading: SMOOTH and STORMING */
-
-            if (!optarg || 
-                (((loading_mode = atol (optarg)) != LOAD_MODE_SMOOTH && 
-                  loading_mode != LOAD_MODE_HYPER )))
-            {
-              fprintf (stderr, "%s error: -m to be followed by a number either %d or %d.\n",
-                       __func__, LOAD_MODE_SMOOTH, LOAD_MODE_HYPER);
-              return -1;
-            }
-
-          break;
-
-        case 'o': /* Print body of the file to stdout. Default - just skip it. */
-          output_to_stdout = 1;
-          break;
-
-        case 'r':
           break;
 
         case 's': /* Stderr printout of client messages (instead of to a batch logfile). */
@@ -238,8 +217,8 @@ void print_help ()
   fprintf (stderr, " -e[rror drop client (smooth mode). Client on error doesn't attempt next cycle]\n");
   fprintf (stderr, " -i[ntermediate (snapshot) statistics time interval (default 3 sec)]\n");
   fprintf (stderr, " -l[ogfile max size in MB (default 1024). On the size reached, file pointer rewinded]\n");
-  fprintf (stderr, " -m[ode of loading, 0 - hyper  (default), 1 - smooth]\n");
-  fprintf (stderr, " -r[euse onnections disabled. Close connections and re-open them. Try with and without]\n");
+  //fprintf (stderr, " -m[ode of loading, 0 - hyper  (default), 1 - smooth]\n");
+  //fprintf (stderr, " -r[euse onnections disabled. Close connections and re-open them. Try with and without]\n");
   fprintf (stderr, " -t[hreads number to run batch clients as sub-batches in several threads. Works to utilize SMP/m-core HW]\n");
   fprintf (stderr, " -v[erbose output to the logfiles; includes info about headers sent/received]\n");
   fprintf (stderr, " -u[rl logging - logs url names to logfile, when -v verbose option is used]\n");
